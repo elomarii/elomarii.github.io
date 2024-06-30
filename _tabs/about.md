@@ -7,11 +7,11 @@ order: 4
 
 Welcome to my personal web space !!
 
-I'm a (almost) graduate student in information systems engineering with a focus on
-network and security. Currently working, as an intern, on a project involving
-software vulnerabilities detection via reinforcement learning.
+I am an enthusiastic engineering student specializing in networks and security, backed by hands-on experience acquired through academic projects, extracurricular activities, and professional endeavors. Always eager to expand his knowledge and skill set, super excited and motivated to explore new technologies and gain hands-on experience in the field.
 
 Interested in having a chat !! Contact me via my socials.
+
+<script src="https://tryhackme.com/badge/2760528"></script>
 
 ## Work Timline
 
@@ -24,7 +24,9 @@ Interested in having a chat !! Contact me via my socials.
 - [<b style="font-size: 16pt">RWTH Aache University</b>](https://www.rwth-aachen.de),&nbsp;&nbsp;&nbsp;&nbsp; *october 2024 - march 2024*
 > Communication Systems Engineering, IT Security, Industrial Networks Security, High Performance Computing,
 > Post Quantum Cryptography
+
 - [<b style="font-size: 16pt">Grenoble INP Ensimag</b>](https://ensimag.grenoble-inp.fr),&nbsp;&nbsp;&nbsp;&nbsp; *september 2021 - september 2024*
-> Object Oriented Programming, 
+> Operating systems, Networks & Security, Algorithms & Optimisation, Databases, Object Oriented Programming, Human Machine Interaction, Web Development
+
 - <b style="font-size: 16pt">CPGE</b>,&nbsp;&nbsp;&nbsp;&nbsp; *september 2019 - june 2021*
 > Mathematics, Physics, and Engineering Sciences (MPSI)
