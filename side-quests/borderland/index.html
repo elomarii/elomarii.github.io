@@ -1,0 +1,134 @@
+<!doctype html><html lang=en-us><head><title>Project - Borderland | alfa7i7</title><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content><meta name=generator content="Hugo 0.148.0"><link rel=canonical href=/side-quests/borderland/><link href=/css/style.min.041e4a3e04c8d069c51f822569eabf716b17b3aec0c9052ef93405591a10b665.css rel=stylesheet><script src=https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js></script><script>mermaid.initialize({startOnLoad:!0})</script></head><body><div class=flexWrapper><header class=headerWrapper><div class=header><div><a class=terminal href=/><span>alfa7i7@empire ~ $</span></a></div><input class=side-menu type=checkbox id=side-menu>
+<label class=hamb for=side-menu><span class=hamb-line></span></label><nav class=headerLinks><ul><li><a href=/posts title>~/blog</a></li><li><a href=/side-quests title>~/side-quests</a></li><li><a href=/whoami title>~/whoami</a></li></ul></nav></div></header><div class=content><main class=main><div class=postWrapper><h1>Project - Borderland</h1><section class=postMetadata><dl><dt>tags</dt><dd><span></span>
+<a href=/tags/active-directory/>#Active Directory</a><span></span>
+<a href=/tags/windows/>#Windows</a><span></span>
+<a href=/tags/powershell/>#PowerShell</a><span></span>
+<a href=/tags/dns/>#DNS</a><span></span>
+<a href=/tags/dhcp/>#DHCP</a><span></span>
+<a href=/tags/nat/>#NAT</a></dd><dt>published</dt><dd><time datetime=2025-01-25>January 25, 2025</time></dd><dt>reading time</dt><dd>7 minutes</dd></dl></section><div><h1 id=ii-intro>II. Intro</h1><p>In this project, I will set up an Active Directory environment featuring one
+domain controller and one workstation, as illustrated in the diagram below.
+To mimic an enterprise network setup, both machines will be configured within
+an internal network. The domain controller will serve as a router, utilizing
+NAT (Network Address Translation) to enable devices within the local network to
+access the internet.</p><pre class=mermaid>
+  architecture-beta
+    group inet(cloud)[Internal Network]
+
+    service dc(server)[Domain Controller] in inet
+    service workstation(server)[Workstation] in inet
+    service gateway(internet)[Internet]
+
+    dc:L -- R:workstation
+    gateway:L -- R:dc
+</pre><p>I am running this lab using VirtualBox, though the process should be largely
+similar with any other virtualization software. For the setup, I will use
+Windows Server 2019 as the domain controller and Windows 10 as the regular
+workstation. This configuration will be sufficient to demonstrate various
+Active Directory attacks in future projects.</p><p>I have gone through the process of setting up this lab multiple times,
+experimenting with different versions of Windows (for both the domain
+controller and the workstation) and adjusting system specifications to optimize
+resource usage across my host machine (Windows 11), the domain controller, the
+workstation, and the Kali machine used to launch attacks. The configuration
+outlined below worked best for my environment, but you may need to make
+adjustments—such as modifying RAM, disk size, or Windows versions—depending on
+your specific requirements.</p><blockquote><p>You may encounter performance issues while using the virtual machine, and
+these issues are not necessarily due to low specs of your host machine. More
+often than not, the problem arises because Windows virtualization features
+(if your host machine is running Windows) interfere with the virtual machine.
+To address this issue:</p><ol><li>Disable Memory Integrity feature</li><li>From CommandPrompt, run <code>bcdedit /set hypervisorlaunchtype off</code></li><li>Optionally if you have Hyper-V feature enabled, you may consider to disable it</li><li>Restart your machine</li></ol><p>This is a popular issue that you can read more about in <a href="https://forums.virtualbox.org/viewtopic.php?f=25&amp;t=99390">this forum</a></p></blockquote><h1 id=ii-setup>II. Setup</h1><p>A video format proved to be more convenient for documenting all the steps
+involved in creating the environment. However, below, I have outlined the steps
+in detail, including explanations for some of the decisions I made and
+additional resources I used throughout the process.</p><div style=position:relative;padding-bottom:56.25%;height:0;overflow:hidden><iframe allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" loading=eager referrerpolicy=strict-origin-when-cross-origin src="https://www.youtube.com/embed/BkI1c2D5f0U?autoplay=0&amp;controls=1&amp;end=0&amp;loop=0&amp;mute=0&amp;start=0" style=position:absolute;top:0;left:0;width:100%;height:100%;border:0 title="YouTube video"></iframe></div><h2 id=iii-setup-windows-server-vm>II.i. Setup Windows Server VM</h2><ol><li><p>Create the VM in Virtual Box and configure network adapterss:
+Use the Windows Server ISO file to create a new virtual machine. This VM will
+have two network interfaces: one for connecting to the internet and another for
+connecting to the local network. The first interface will handle internet access,
+while the second will route traffic for all machines within the local network.</p></li><li><p>Install windows Server 2019:
+The installation process is straightforward. You can choose between the full
+desktop GUI environment or a minimalist version with only command prompt access
+(use this if you&rsquo;re a CommandPromt/PowerShell guru).</p></li><li><p>Change default computer name:
+Update the computer name for better readability and organization.</p></li><li><p>Install Virtual Box guest additions:
+Install the VirtualBox Guest Additions to enable features like automatic
+screen resizing, allowing the VM&rsquo;s display to scale dynamically with the
+available window size.</p></li></ol><h2 id=iiii-install-and-configure-server-features>II.ii. Install and Configure Server Features</h2><p>All the functionalities we require are available as features that can be
+installed and configured on any machine accessible via the network. Below are
+the key steps for setting up these features:</p><ol><li><p>Install and configure Active Directory Domain Services (AD DS)
+: Begin by installing the AD DS feature, which is central to creating and
+managing an Active Directory environment. After installation, promote the
+server to a domain controller by creating and deploying the Active Directory
+Domain. This process includes setting up an integrated DNS server, which is
+essential for name resolution within the network.</p></li><li><p>Install and configure Remote Access Services (RAS):
+The Remote Access Server (RAS) is a versatile feature with various use cases,
+such as providing VPN access or acting as a router. In this setup, the RAS will
+be configured to function as a router, enabling machines within the internal
+network to communicate with the internet.</p></li><li><p>Install/setup DHCP server:
+Configure the DHCP server to define an IP address pool, along with other
+network parameters like subnet masks, default gateways, and DNS server
+addresses. This ensures that any machine joining the network can automatically
+receive the necessary configurations to function seamlessly within the
+environment.</p></li></ol><h2 id=iiiii-adding-users>II.iii. Adding Users</h2><p>Initially, our domain has several containers that serve different purposes,
+notably:</p><ul><li><p><code>Computers</code>: contains all computers on the AD network.</p></li><li><p><code>Domain Controllers</code>: contains all computers qualified as DCs. At first it contains only the windows server.</p></li><li><p><code>Users</code>: contains default users (Administrator, krbtgt, and Guest) and default security groups.</p></li></ul><p>When we deal with a lot of user accounts, it is best practice to organize them
+based on function/role/permissions/etc in different Organizational Units (OUs).
+This is mainly for organizing AD objects and does not necessarly influence
+other aspects of the accounts (such as privileges).</p><p>Pay attention not to mix containers with OUs or with groups.
+Each one of these plays a different role in the AD network.</p><ul><li><p>Container: A default, non-customizable object for storing AD objects (users, groups, computers).</p></li><li><p>Group (aka Security Group): Security principal that manages permissions and access to resources.</p></li><li><p>Organizational Unit (OU): Logical structure for organizing and managing AD objects.</p></li></ul><p>The users I will add to the domain are listed in the <code>users.txt</code> file. To organize
+them effectively, I will create three Organizational Units. Users within
+the <code>_CITIZENS</code> OU will be granted administrative privileges over the domain,
+allowing them to manage domain resources and configurations. The PowerShell
+script <code>add_users.ps1</code> automates the process of creating the OUs, adding users
+from the <code>users.txt</code> file, and assigning the necessary permissions to the
+<code>_CITIZENS</code> OU members.</p><pre tabindex=0><code>Mira Kano _CITIZENS Password123
+Ginji Kyuma _CITIZENS Password123
+Momoka Inoue _DEALERS Password123
+Ryohei Arisu _PLAYERS Password123
+Yuzuha Usagi _PLAYERS Password123
+Shuntaro Chishiya _PLAYERS Password123
+</code></pre><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-powershell data-lang=powershell><span style=display:flex><span><span style=color:#75715e># Add Organizational units</span>
+</span></span><span style=display:flex><span>New-ADOrganizationalUnit -Name _CITIZENS <span style=color:#75715e># protected by default from accidental deletion</span>
+</span></span><span style=display:flex><span>New-ADOrganizationalUnit -Name _DEALERS
+</span></span><span style=display:flex><span>New-ADOrganizationalUnit -Name _PLAYERS
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>$USERS = Get-Content users.txt
+</span></span><span style=display:flex><span><span style=color:#66d9ef>foreach</span> ($line <span style=color:#66d9ef>in</span> $USERS) {
+</span></span><span style=display:flex><span>    $first = $line.Split(<span style=color:#e6db74>&#34; &#34;</span>)[<span style=color:#ae81ff>1</span>]
+</span></span><span style=display:flex><span>    $last = $line.Split(<span style=color:#e6db74>&#34; &#34;</span>)[<span style=color:#ae81ff>0</span>]
+</span></span><span style=display:flex><span>    $ou = $line.Split(<span style=color:#e6db74>&#34; &#34;</span>)[<span style=color:#ae81ff>2</span>]
+</span></span><span style=display:flex><span>    $pass = ConvertTo-SecureString $line.Split(<span style=color:#e6db74>&#34; &#34;</span>)[<span style=color:#ae81ff>3</span>] -AsPlainText -Force
+</span></span><span style=display:flex><span>    $username = <span style=color:#e6db74>&#34;</span>$($first.Substring(<span style=color:#ae81ff>0</span>,<span style=color:#ae81ff>1</span>))$last<span style=color:#e6db74>&#34;</span>.ToLower()
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e># Create users</span>
+</span></span><span style=display:flex><span>    New-ADUser -Name <span style=color:#e6db74>&#34;</span>$first<span style=color:#e6db74> </span>$last<span style=color:#e6db74>&#34;</span> `
+</span></span><span style=display:flex><span>        -SamAccountName $username `
+</span></span><span style=display:flex><span>        -UserPrincipalName <span style=color:#e6db74>&#34;</span>$username<span style=color:#e6db74>@borderland.local&#34;</span> `
+</span></span><span style=display:flex><span>        -EmailAddress <span style=color:#e6db74>&#34;</span>$username<span style=color:#e6db74>@borderland.local&#34;</span> `
+</span></span><span style=display:flex><span>        -AccountPassword $pass `
+</span></span><span style=display:flex><span>        -Path <span style=color:#e6db74>&#34;OU=</span>$ou<span style=color:#e6db74>,DC=borderland,DC=local&#34;</span> `
+</span></span><span style=display:flex><span>        -Enabled $true <span style=color:#75715e># new user disabled by default</span>
+</span></span><span style=display:flex><span>    
+</span></span><span style=display:flex><span>    <span style=color:#75715e># Add user to administrators if from the citizens OU</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> ($ou <span style=color:#f92672>-eq</span> <span style=color:#e6db74>&#34;_CITIZENS&#34;</span>) {
+</span></span><span style=display:flex><span>        Add-ADGroupMember -Identity <span style=color:#e6db74>&#34;Domain Admins&#34;</span> -Members $username
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><blockquote><p>Note: This is not the best way to set a password for a new user in a real network.
+What we can do however, is to force the user to change their password upon
+first login.</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-powershell data-lang=powershell><span style=display:flex><span>Set-ADUser -Identity <span style=color:#e6db74>&#34;rarisu&#34;</span> -ChangePasswordAtLogon $true
+</span></span></code></pre></div></blockquote><h2 id=iiiv-set-up-windows-10-vm>II.iv. Set up Windows 10 VM</h2><p>Setting up a workstation is a straightforward process. However, it is essential
+to ensure that the machine is configured with the correct DNS server IP address
+so it can resolve the domain name when attempting to join the domain. In most
+cases, this should happen automatically if the workstation obtains its network
+configuration from the DHCP server. If the correct DNS settings are not applied,
+you can manually configure the DNS server IP address to point to the domain
+controller.</p><p>The steps to follow in this stage are as follows:</p><ol><li>Create new VM</li><li>Configure network adapter</li><li>Install Windows 10</li><li>Change name</li><li>Check out IPv4 configuration</li><li>Check out DNS server</li><li>Join the domain</li></ol><h1 id=iii-the-game>III. The Game</h1><p>With our environment fully set up and operational, we can now begin exploring
+and performing classic attacks commonly found in an Active Directory network.
+This setup provides the flexibility to demonstrate and understand the following
+attack techniques:</p><ol><li>LLMNR Poisoning</li><li>SMB Relay Attack</li><li>Pass-the-Password / Pass-the-Hash</li><li>Kerberoasting</li><li>Golden Ticket Attack</li></ol><p>In the next one, we will dive deep into each of these attacks, exploring how
+they are executed and, more importantly, how to remediate these vulnerabilities
+effectively. For attacks requiring specific configurations, we will ensure the
+environment is appropriately prepared to simulate realistic scenarios and better
+understand mitigation strategies.</p><blockquote><p>Update 21/06/2025:</p><p><em>I completed the HackTheBox CPTS course and practiced all of the attacks
+mentioned above, along with several others. I don&rsquo;t plan to release a second
+part to this blog, but I highly recommend the HTB material to anyone interested
+in Active Directory pentesting. A good starting point is the <code>Active Directory Enumeration and Attacks</code> module, and for more advanced topics, you can explore
+CAPE’s modules.</em></p></blockquote></div></div></main></div><footer class=footer><span>© 2025 alfa7i7, Built with
+<a href=https://gohugo.io class=footerLink>Hugo</a> and
+<a href=https://github.com/LordMathis/hugo-theme-nightfall class=footerLink>Nightfall</a> theme</span></footer></div></body></html>

