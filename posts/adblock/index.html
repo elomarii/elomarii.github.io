@@ -1,0 +1,100 @@
+<!doctype html><html lang=en-us><head><title>Black Hole | alfa7i7</title><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content><meta name=generator content="Hugo 0.148.0"><link rel=canonical href=/posts/adblock/><link href=/css/style.min.041e4a3e04c8d069c51f822569eabf716b17b3aec0c9052ef93405591a10b665.css rel=stylesheet><script src=https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js></script><script>mermaid.initialize({startOnLoad:!0})</script></head><body><div class=flexWrapper><header class=headerWrapper><div class=header><div><a class=terminal href=/><span>alfa7i7@empire ~ $</span></a></div><input class=side-menu type=checkbox id=side-menu>
+<label class=hamb for=side-menu><span class=hamb-line></span></label><nav class=headerLinks><ul><li><a href=/posts title>~/blog</a></li><li><a href=/side-quests title>~/side-quests</a></li><li><a href=/whoami title>~/whoami</a></li></ul></nav></div></header><div class=content><main class=main><div class=postWrapper><h1>Black Hole</h1><section class=postMetadata><dl><dt>tags</dt><dd><span></span>
+<a href=/tags/pi-hole/>#Pi-Hole</a><span></span>
+<a href=/tags/dns/>#DNS</a><span></span>
+<a href=/tags/adblocker/>#Adblocker</a></dd><dt>published</dt><dd><time datetime=2025-08-31>August 31, 2025</time></dd><dt>reading time</dt><dd>6 minutes</dd></dl></section><div><p>Needless to say why anyone would want to get rid of ads. Nevertheless, the choices
+aren&rsquo;t so many; keep quiet and watch, pay a subscription(s), or embrace the power
+of networking.</p><p>I&rsquo;m using an adblocker on my browser already, but this is not enough. I still got
+to spend countless hours watching ads on my phone and home tv.. Why all this misery!</p><p>The question: How to block these ads? The answer that I found straight forward and
+easy to set up is a <a href=https://pi-hole.net>Pi-Hole</a>. This is basically a custom DNS server that keeps track
+of known advertisement domain names and, whenever a request is made to one of these
+domains, the traffic gets blocked or redirected to a rogue server.</p><p>Yep, it depends on the block lists and how well they&rsquo;re maintained, but this, as a
+locally deployed solution, is something I&rsquo;m good with right now. I think I read
+somewhere that the lists are updated bi-weekly, so it should by way better than
+using no adblocker at all.</p><h1 id=i-the-hole>I. The hole</h1><p>First thing I need is a computer. I will use a VERY old HP desktop with 516MB of RAM
+and 80GB of disk storage, which has been gathering dust for quiet a while. By the
+<a href=https://docs.pi-hole.net/main/>documentation</a> of Pi-Hole, these specs should be enough.</p><p><img src=one.png alt="the beast"></p><p>I managed to boot from USB but apparently <a href=https://ventoy.net/>Ventoy</a> (if you don&rsquo;t know this you&rsquo;re
+missing some cool stuff) is not working. Thus, I had to burn an OS ISO to the USB
+stick.</p><p>Pi-Hole has a list of supported operating systems (Ubuntu, Fedora, &mldr;etc).
+However I have already burnt Arch Linux to my stick to use a minimal installation.
+In this case, I will have to use the Docker image of Pi-Hole afterwards.</p><p>Burning Arch to the USB stick (<code>/dev/sda</code>) using <code>dd</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>$ lsblk
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+</span></span><span style=display:flex><span>sda           8:0    1   7.2G  0 disk
+</span></span><span style=display:flex><span>└─sda1        8:1    1   7.2G  0 part
+</span></span><span style=display:flex><span>zram0       253:0    0     4G  0 disk [SWAP]
+</span></span><span style=display:flex><span>nvme0n1     259:0    0 476.9G  0 disk
+</span></span><span style=display:flex><span>├─nvme0n1p1 259:1    0   300M  0 part
+</span></span><span style=display:flex><span>├─nvme0n1p2 259:2    0   128M  0 part
+</span></span><span style=display:flex><span>├─nvme0n1p3 259:3    0 280.4G  0 part
+</span></span><span style=display:flex><span>├─nvme0n1p4 259:4    0     1G  0 part
+</span></span><span style=display:flex><span>├─nvme0n1p5 259:5    0  17.3G  0 part
+</span></span><span style=display:flex><span>├─nvme0n1p6 259:6    0   1.5G  0 part
+</span></span><span style=display:flex><span>├─nvme0n1p7 259:7    0     1G  0 part /boot
+</span></span><span style=display:flex><span>└─nvme0n1p8 259:8    0 175.4G  0 part /
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>$ sudo dd <span style=color:#66d9ef>if</span><span style=color:#f92672>=</span>~/Documents/archlinux-2025.06.01-x86_64.iso of<span style=color:#f92672>=</span>/dev/sda
+</span></span><span style=display:flex><span> 
+</span></span><span style=display:flex><span>[sudo] password for archer:
+</span></span><span style=display:flex><span>2453568+0 records in
+</span></span><span style=display:flex><span>2453568+0 records out
+</span></span><span style=display:flex><span>1256226816 bytes (1.3 GB, 1.2 GiB) copied, 511.897 s, 2.5 MB/s
+</span></span></code></pre></div><p>Just followed <code>archinstall</code> for installation (btw, the PC is connected to the router via ethernet
+cable).</p><p><img src=two.jpeg alt="arch install"></p><p>Fast forward.. Now that Arch is good to go, let&rsquo;s set up our Pi-Hole.</p><h1 id=ii-the-pie>II. The pie</h1><p>I will just follow the <a href=https://docs.pi-hole.net/main/prerequisites/>Get Started</a> manual
+from Pi-Hole docs.</p><p>One, I need need to assign a static IP for the Pi-Hole host. This will depend on the router:
+In my case, I added a DHCP binding, binding the MAC address of the host to the IP address
+<code>192.168.1.26</code> (this IP will be used to set up DNS later).</p><p><img src=three.png alt="dhcp binding"></p><p>Two, to <em>&ldquo;block traffic from the internet for security reasons&rdquo;</em>, I&rsquo;ll use <code>iptables</code> to set
+firewall rules for my local subnet <code>192.168.1.0/24</code>. Other incoming traffic is blocked
+by default when using <code>iptables</code>.</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-shell data-lang=shell><span style=display:flex><span>iptables -I INPUT <span style=color:#ae81ff>1</span> -s 192.168.1.0/24 -p tcp -m tcp --dport <span style=color:#ae81ff>80</span> -j ACCEPT
+</span></span><span style=display:flex><span>iptables -I INPUT <span style=color:#ae81ff>1</span> -s 192.168.1.0/24 -p tcp -m tcp --dport <span style=color:#ae81ff>443</span> -j ACCEPT
+</span></span><span style=display:flex><span>iptables -I INPUT <span style=color:#ae81ff>1</span> -s 127.0.0.0/8 -p tcp -m tcp --dport <span style=color:#ae81ff>53</span> -j ACCEPT
+</span></span><span style=display:flex><span>iptables -I INPUT <span style=color:#ae81ff>1</span> -s 127.0.0.0/8 -p udp -m udp --dport <span style=color:#ae81ff>53</span> -j ACCEPT
+</span></span><span style=display:flex><span>iptables -I INPUT <span style=color:#ae81ff>1</span> -s 192.168.1.0/24 -p tcp -m tcp --dport <span style=color:#ae81ff>53</span> -j ACCEPT
+</span></span><span style=display:flex><span>iptables -I INPUT <span style=color:#ae81ff>1</span> -s 192.168.1.0/24 -p udp -m udp --dport <span style=color:#ae81ff>53</span> -j ACCEPT
+</span></span><span style=display:flex><span>iptables -I INPUT <span style=color:#ae81ff>1</span> -p udp --dport 67:68 --sport 67:68 -j ACCEPT
+</span></span><span style=display:flex><span>iptables -I INPUT <span style=color:#ae81ff>1</span> -p udp --dport <span style=color:#ae81ff>123</span> -j ACCEPT
+</span></span><span style=display:flex><span>iptables -I INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+</span></span></code></pre></div><p><img src=four.jpeg alt="firewall rules"></p><p>As I mentioned earlier, Arch is not supported by Pi-Hole, so I had to use Docker.</p><p>Installing Docker and Docker Compose on Pi-Hole host:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-shell data-lang=shell><span style=display:flex><span>sudo pacman -S docker docker-compose
+</span></span></code></pre></div><p>There is a sample Docker Compose file given in the documentation for quick start.
+I used it as a template and removed configuration for when the Pi-Hole needs to be
+used as DHCP server:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>services</span>:
+</span></span><span style=display:flex><span>   <span style=color:#f92672>pihole</span>:
+</span></span><span style=display:flex><span>    <span style=color:#f92672>container_name</span>: <span style=color:#ae81ff>pihole</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>image</span>: <span style=color:#ae81ff>pihole/pihole:latest</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>ports</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#e6db74>&#34;53:53/tcp&#34;</span>
+</span></span><span style=display:flex><span>      - <span style=color:#e6db74>&#34;53:53/udp&#34;</span>
+</span></span><span style=display:flex><span>      - <span style=color:#e6db74>&#34;80:80/tcp&#34;</span>
+</span></span><span style=display:flex><span>      - <span style=color:#e6db74>&#34;443:443/tcp&#34;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>environment</span>:
+</span></span><span style=display:flex><span>      <span style=color:#f92672>TZ</span>: <span style=color:#e6db74>&#39;Africa/Casablanca&#39;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>FTLCONF_webserver_api_password</span>: <span style=color:#e6db74>&#39;REDACTED&#39;</span>
+</span></span><span style=display:flex><span>      <span style=color:#f92672>FTLCONF_dns_listening</span>: <span style=color:#e6db74>&#39;all&#39;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>volumes</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#e6db74>&#39;./etc-pihole:/etc/pihole&#39;</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>cap_add</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>NET_ADMIN</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>SYS_TIME</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ae81ff>SYS_NICE</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>restart</span>: <span style=color:#ae81ff>unless-stopped</span>
+</span></span></code></pre></div><p><img src=five.jpeg alt="docker compose yaml"></p><p>I built the image and started the container, but found <code>systemd-resolved</code> service using the
+port 53. This prevented the container from running. Then I stopped and disabled the service
+and relaunch docker compose again.</p><p><img src=six.jpeg alt="resolved not minding its business"></p><p><img src=seven.jpeg alt="killing it and starting pi hole"></p><h1 id=iii-pi-hole-black-hole>III. Pi-Hole Black Hole</h1><p>To make the network use Pi-Hole as a DNS server, I needed to configure this on the router
+level. Also, I need to keep it the only server so that blocked queries don&rsquo;t get served
+another way.</p><p><img src=eight.png alt="pi hole as dns server"></p><p>Upon install, my DNS config on the pi-hole host is no longer functional (because no DNS
+server is known to the system). The host has to use itself as DNS server, redirecting DNS
+queries to the pi-hole container on port 53.</p><p>I changed the <code>nameserver</code> entry in <code>/etc/resolv.conf</code> from <code>127.0.0.53</code> to <code>172.0.0.1</code>,
+which (on port 53) is pointing to the pi-hole DNS server.</p><p>Pi-Hole comes with a web dashboard for management. Management is also possible via the
+command line on the container without needing web access.</p><p><img src=nine.png alt="pi hole dashboard"></p><p>I noticed some queries went through the Pi-Hole as shown in the dashboard, but nothing
+is blocked yet.</p><p>Navigating to lists tab, I figured that I needed to pull the block lists (I thought that
+they were pulled upon install):</p><p><img src=ten.png alt="lists need update"></p><p><img src=eleven.png alt="update success"></p><p>However, I still don&rsquo;t think the setup is working and requests are not handled at all,
+cz the statistics on the dashboard don&rsquo;t change much.</p><p>Looking at the logs, I found that Pi-Hole does not consider requests from outside its
+local network, since it&rsquo;s running on docker, it&rsquo;s two hops away from the actual network
+where my devices are connected (the IP on the screenshot belongs to my phone).</p><p><img src=twelve.png alt="dnsmasq warning"></p><p>One solution (potentially dangerous, but no worries I&rsquo;ve already configured the firewall),
+is to allow Pi-Hole to respond to all requests as the option is available in the advanced
+DNS settings from the web dashboard:</p><p><img src=thirteen.png alt="dns allow all"></p><p>Now I can see that it started to block some traffic and that it responded to a few clients
+on the local network:</p><p><img src=fourteen.png alt="ads blocked yay"></p><p><img src=fifteen.png alt="clients of pi hole"></p><p><strong>Observations:</strong></p><ul><li>Some of the clients were not able to use DNS server of Pi-Hole until I manually expired
+their DHCP lease and connect them back to the network.</li><li>Not all ads are blocked, but the percentage that is being blocked is quiet
+noticeable. It seems like a good experience overall.</li><li>&mldr;</li><li>I&rsquo;ll note any other observations here as long as I&rsquo;m deploying Pi-Hole within my network.</li></ul></div></div></main></div><footer class=footer><span>© 2025 alfa7i7, Built with
+<a href=https://gohugo.io class=footerLink>Hugo</a> and
+<a href=https://github.com/LordMathis/hugo-theme-nightfall class=footerLink>Nightfall</a> theme</span></footer></div></body></html>
